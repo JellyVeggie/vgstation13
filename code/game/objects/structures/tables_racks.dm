@@ -564,8 +564,7 @@
 	desc = "A version of the four legged table. It is stronger."
 	icon_state = "reinftable"
 	parts = /obj/item/weapon/table_parts/reinforced
-	var/status = 2 //DARE YOU ENTER MY MAGICAL NUMBER REALM?
-	var/can_optable = TRUE
+	var/status = 2
 
 /obj/structure/table/reinforced/can_disassemble()
 	return status != 2
@@ -577,7 +576,7 @@
 		return ..()
 
 /obj/structure/table/reinforced/attackby(obj/item/weapon/W as obj, mob/user as mob, params)
-	if(istype(W,/obj/item/weapon/stock_parts/scanning_module) && can_optable)
+	if(istype(W,/obj/item/weapon/stock_parts/scanning_module))
 		playsound(src, 'sound/items/Deconstruct.ogg', 50, 1)
 		if(do_after(user, src, 40))
 			if(user.drop_item(W))
@@ -660,19 +659,9 @@
 		..()
 
 
-/*
- * Brass
- */
 
-/obj/structure/table/reinforced/clockwork
-	name = "brass table"
-	desc = "A solid, slightly beveled brass table."
-	icon_state = "clock_table"
-	parts = /obj/item/weapon/table_parts/clockwork
-	can_optable = FALSE
 
-/obj/structure/table/reinforced/clockwork/cultify()
-	return
+
 
 /*
  * Racks

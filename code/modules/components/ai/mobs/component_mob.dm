@@ -9,7 +9,6 @@
 	..()
 	BrainContainer = new (src)
 	InitializeComponents()
-	BrainContainer.register_for_updates()
 
 /mob/living/component/proc/InitializeComponents()
 	// Set up components here
