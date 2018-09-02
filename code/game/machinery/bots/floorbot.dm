@@ -129,31 +129,30 @@ var/global/list/floorbot_targets=list()
 		O.show_message("<span class='game say'><span class='name'>[src]</span> beeps, \"[message]\"",2)
 	return
 
-/obj/machinery/bot/floorbot/attackby(var/obj/item/W , mob/user)
+/obj/machinery/bot/floorbot/attackby(var/obj/item/W , mob/user as mob)
 	if(istype(W, /obj/item/stack/tile/plasteel))
 		var/obj/item/stack/tile/plasteel/T = W
-		if(amount >= 50)
+		if(src.amount >= 50)
 			return
 		var/loaded = min(50-src.amount, T.amount)
 		T.use(loaded)
-		amount += loaded
-		to_chat(user, "<span class='notice'>You load [loaded] tiles into the floorbot. He now contains [amount] tiles.</span>")
-		updateicon()
-		updateUsrDialog()
+		src.amount += loaded
+		to_chat(user, "<span class='notice'>You load [loaded] tiles into the floorbot. He now contains [src.amount] tiles.</span>")
+		src.updateicon()
 	else if(istype(W, /obj/item/weapon/card/id)||istype(W, /obj/item/device/pda))
-		if(allowed(usr) && !open && !emagged)
-			locked = !locked
-			to_chat(user, "<span class='notice'>You [locked ? "lock" : "unlock"] \the [src]'s behaviour controls.</span>")
-			updateUsrDialog()
+		if(src.allowed(usr) && !open && !emagged)
+			src.locked = !src.locked
+			to_chat(user, "<span class='notice'>You [src.locked ? "lock" : "unlock"] the [src] behaviour controls.</span>")
 		else
 			if(emagged)
 				to_chat(user, "<span class='warning'>ERROR</span>")
-			else if(open)
+			if(open)
 				to_chat(user, "<span class='warning'>Please close the access panel before locking it.</span>")
 			else
 				to_chat(user, "<span class='warning'>Access denied.</span>")
+		src.updateUsrDialog()
 	else
-		. = ..()
+		..()
 
 /obj/machinery/bot/floorbot/Emag(mob/user as mob)
 	..()
