@@ -1897,6 +1897,8 @@
 #include "code\modules\power\antimatter\containment_jar.dm"
 #include "code\modules\power\antimatter\control.dm"
 #include "code\modules\power\antimatter\shielding.dm"
+#include "code\modules\power\capacitors\capacitor_bank.dm"
+#include "code\modules\power\capacitors\capacitor_network.dm"
 #include "code\modules\power\singularity\collector.dm"
 #include "code\modules\power\singularity\containment_field.dm"
 #include "code\modules\power\singularity\emitter.dm"
