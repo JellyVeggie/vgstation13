@@ -1,72 +1,152 @@
 /obj/machinery/power/capacitor_bank
-	name = "Capacitor bank"
+	name = "capacitor bank"
 	desc = "Entire stacks of capacitors to store power with."
 
+	//Icons
 	icon = 'icons/obj/machines/capacitor_bank.dmi'
-	icon_state = "capacitor_bank_simple"
-	icon_state_open = "capacitor_bank_simple_open"
-	var/icon_state_broken = "capacitor_bank_simple_broken"
-	var/icon_state_off = "capacitor_bank_simple"
-	var/icon_state_on = "capacitor_bank_simple"
+	icon_state = "capacitor_bank"
+	icon_state_open = "capacitor_bank_open"
+	var/icon_state_broken = "capacitor_bank_broken"
+	var/icon_state_openb = "capacitor_bank_openb"
+	var/icon_state_off = "capacitor_bank"
+	var/icon_state_on = "capacitor_bank_on"
+	var/icon_state_active = "capacitor_bank_on"
 
+	//Machine stuff
 	density = 1
-
 	machine_flags = SCREWTOGGLE | CROWDESTROY | FIXED2WORK | WRENCHMOVE
 
-	var/datum/capacitor_network/cap_network //The network we belong to
-
-	var/actual_capacity = 0 //How much charge we can hold. 125e4 J per capacitor, see update_parts()
-	var/capacity_loss = 0   //How much capacity we've lost to damage
-	var/capacity = 0
-
-	var/list/neighbor_dirs = list(1, 2, 4, 8)                          //Directions we can look for neighbors in
-	var/list/obj/machinery/power/capacitor_bank/neighbors = list() //Neighbors we're connected to, and where they are relative to us
-
-		component_parts = newlist(
+	component_parts = newlist(
 		/obj/item/weapon/circuitboard/capacitor_bank,
 		/obj/item/weapon/stock_parts/capacitor,
 		/obj/item/weapon/stock_parts/capacitor,
 		/obj/item/weapon/stock_parts/capacitor,
-		/obj/item/weapon/stock_parts/capacitor,
+		/obj/item/weapon/stock_parts/capacitor
 	)
 
+	//Capacity
+
+	var/actual_capacity = 0 //How much charge we can hold.
+	var/capacity_loss = 0   //How much capacity we've lost to damage
+	var/capacity = 0        //Actual - loss
+
+	//Network
+	var/datum/capacitor_network/cap_network //The network we belong to
+
+	var/list/connected_dirs = list()
+	var/list/neighbors[8]
+
+	var/list/wire_underlays[8]
 
 /obj/machinery/power/capacitor_bank/New()
-	update_capacity()
-	find_neighbors()
+	..()
+	wire_underlays[NORTH] = image('icons/obj/machines/capacitor_bank.dmi',icon_state = "wire_un")
+	wire_underlays[SOUTH] = image('icons/obj/machines/capacitor_bank.dmi',icon_state = "wire_us")
+	wire_underlays[EAST]  = image('icons/obj/machines/capacitor_bank.dmi',icon_state = "wire_ue")
+	wire_underlays[WEST]  = image('icons/obj/machines/capacitor_bank.dmi',icon_state = "wire_uw")
+	state = 1
 	update_icon()
 
 /obj/machinery/power/capacitor_bank/Destroy()
-	cap_network.remove_node(.)
+	disconnect()
 	..()
 
+//--Network stuff
+/obj/machinery/power/capacitor_bank/proc/available_dirs()
+	return (cardinal - connected_dirs)
+
+
+/obj/machinery/power/capacitor_bank/proc/find_neighbors()
+	var/list/obj/machinery/power/capacitor_bank/found_neighbors = list()
+	for(var/dir in available_dirs())
+		var/turf/T = get_step(src, dir)
+		if(!T)
+			continue
+		for(var/obj/machinery/power/capacitor_bank/neighbor in T.contents)
+			if(neighbor.cap_network)
+				found_neighbors += neighbor
+	return found_neighbors
+
+
+/obj/machinery/power/capacitor_bank/proc/connect_to(var/obj/machinery/power/capacitor_bank/neighbor, var/dir = null)
+	if(!dir)
+		dir = get_dir_cardinal(src, neighbor)
+
+	neighbors[dir] = neighbor
+	connected_dirs += dir
+	neighbor.neighbors[reverse_direction(dir)] = src
+	neighbor.connected_dirs += reverse_direction(dir)
+	neighbor.update_icon()
+
+
+/obj/machinery/power/capacitor_bank/proc/connect()
+	if(!cap_network)
+		cap_network = new /datum/capacitor_network()
+		cap_network.add_node(src)
+
+	if (!use_power)
+		use_power = 1
+
+	for(var/obj/machinery/power/capacitor_bank/neighbor in find_neighbors())
+		connect_to(neighbor)
+		cap_network.merge_network(neighbor.cap_network)
+	update_icon()
+
+
+/obj/machinery/power/capacitor_bank/proc/disconnect_from(var/obj/machinery/power/capacitor_bank/neighbor, var/dir = null)
+	if(!dir)
+		dir = get_dir_cardinal(src, neighbor)
+
+	neighbors[dir] = null
+	connected_dirs -= dir
+	neighbor.neighbors[reverse_direction(dir)] = null
+	neighbor.connected_dirs -= reverse_direction(dir)
+	neighbor.update_icon()
+
+
+/obj/machinery/power/capacitor_bank/proc/disconnect()
+	var/list/obj/machinery/power/capacitor_bank/old_neighbors = list()
+	var/datum/capacitor_network/old_network = cap_network
+	use_power = 0
+	cap_network.remove_node(src)
+
+	for(var/dir in connected_dirs)
+		old_neighbors += neighbors[dir]
+		disconnect_from(neighbors[dir], dir)
+
+	old_network.rebuild_from(old_neighbors)
+	update_icon()
+
+
+/obj/machinery/power/capacitor_bank/proc/is_mainframe()
+	return 0
 
 //--Capacity suff
-/obj/machinery/power/capacitor_bank/RefreshParts()
-	//Shamelessly stolen from SMES code
-	var/capcount = 0
-	for(var/obj/item/weapon/stock_parts/SP in component_parts)
-		if(istype(SP, /obj/item/weapon/stock_parts/capacitor))
-			capcount += SP.rating
-
-	actual_capacity = capcount*125e4
 
 /obj/machinery/power/capacitor_bank/proc/update_capacity()
+	if (cap_network)
+		cap_network.capacity -= capacity
 	RefreshParts()
 	capacity = actual_capacity - capacity_loss
-
+	if (cap_network)
+		cap_network.capacity += capacity
 
 //--Damage
-
 //Increase capacity_loss, discharge some energy, spawn some sparks and possibly explode
-/obj/machinery/power/capacitor_bank/proc/damage(var/damage, var/no_explosions=0)
+/obj/machinery/power/capacitor_bank/proc/damage(var/base_damage, var/no_explosions=0)
+	var/damage_percent = pick(20;1.1,40;0.8,40;0.4)
+
+	if (!cap_network)
+		return
+
+	var/damage = Clamp(base_damage * damage_percent, 0, min(cap_network.charge, capacity))
+
 	if (!damage)
 		return
 
-	damage = min(damage, cap_network.charge, capacity)
-	cap_network.charge -= damage * rand(5,10)/10
+	cap_network.charge = max(cap_network.charge - damage, 0)
 
-	if (!no_explosions && prob(max(100 * (1 + (-6*4.18e6 / (damage + 5*4.18e6))), 0))) //4.18e6 J = 1 Kg TNT. Takes 1Kg to maybe explode, takes 25Kg for an 80% chance
+	if (!no_explosions && prob(max(100 * (1 + (-6*4.18e6 / (damage + 5*4.18e6))), 0))) //4.18 MJ = 1 Kg TNT. 100% probability to explode on the infinite, starting at 1Kg
 		explode(damage)
 		capacity_loss = actual_capacity
 	else
@@ -74,16 +154,45 @@
 		spark(src)
 
 	update_capacity()
+
 	if (capacity_loss == actual_capacity)
 		stat |= BROKEN
+		disconnect()
+		update_icon()
+
 
 /obj/machinery/power/capacitor_bank/proc/explode(var/damage)
 	var/heavy = round(max(3 * (1 + (-6 / (damage + 5))), 0))
 	var/light = 1 + round(max(5 * (1 + (-6 / (damage + 5))), 0))
 
-	spark(src,6)
+	spark(src, 6)
 	explosion(src, 0, heavy, light, 0)
 	stat |= BROKEN
+
+
+//--Overrides
+
+/obj/machinery/power/capacitor_bank/attackby(var/obj/O, var/mob/user)
+	..()
+	if (istype(O, /obj/item/stack/cable_coil) && !cap_network && state)
+		connect()
+		to_chat(user, "<span class='notice'>You wire \the [src][neighbors.len ? " and connect it to adjacent machines" : ""].</span>")
+
+	if (istype(O, /obj/item/weapon/wirecutters) && cap_network)
+		if(do_after(user, src, 30))
+			disconnect()
+			to_chat(user, "<span class='notice'>You cut \the [src]'s wires.</span>")
+
+/obj/machinery/power/capacitor_bank/wrenchable()
+	var/list/obj/machinery/power/capacitor_bank/other_machines = list()
+	for (var/obj/machinery/power/capacitor_bank/other in src.loc.contents)
+		other_machines += other
+	other_machines -= src
+
+	if(cap_network || other_machines.len > 0) //must not be wired and there must not be another capacitor machine on the same tile (wire nodes)
+		return 0
+	else
+		return ..()
 
 /obj/machinery/power/capacitor_bank/ex_act(severity)
 	switch(severity)
@@ -94,15 +203,19 @@
 			return
 
 		if(2.0)
-			damage(capacity*(rand(3,10)/10))
 			if (prob(50))
 				qdel(src)
+			else if (prob(20)) //10% chance chain reaction (assumming enough charge and damage
+				damage(capacity*(rand(3,10)/10), 0)
+			else
+				damage(capacity*(rand(3,10)/10), 1)
 			return
 
 		if(3.0)
-			damage(capacity*(rand(0,3)/10))
 			if (prob(10))
 				qdel(src)
+			else
+				damage(capacity*(rand(1,3)/10), 1)
 			return
 	return
 
@@ -110,28 +223,35 @@
 	damage(capacity/2)
 	..()
 
-//--Helpers
-/obj/machinery/power/capacitor_bank/proc/find_neighbors()
-	for(var/direction in neighbor_dirs)
-		var/turf/T = get_step(src, direction)
-		if(!T)
-			continue
-		for(var/obj/machinery/power/capacitor_bank/neighbor in T.contents)
-			if(neighbor && !(neighbor in neighbors))
-				neighbors["[direction]"] = neighbor
+/obj/machinery/power/capacitor_bank/RefreshParts()
+	//Shamelessly stolen from SMES code
+	actual_capacity = 0
+	for(var/obj/item/weapon/stock_parts/capacitor/C in component_parts)
+		actual_capacity += C.maximum_charge
+
+/obj/machinery/power/capacitor_bank/examine(mob/user)
+	..()
+	if (cap_network)
+		to_chat(user, "<span class='notice'>The [src] is wired up and fixed in place.</span>")
+	else if(state)
+		to_chat(user, "<span class='notice'>The [src] is anchored to the ground, but could use some wiring.</span>")
 
 /obj/machinery/power/capacitor_bank/update_icon()
 	underlays.len = 0
-	for (var/i in neighbors)
-		var/image/wire = image('icons/obj/machines/capacitor_bank.dmi',icon_state = "wire_underlay")
-		wire.dir = i
-		underlays += wire
+
+	for (var/i in connected_dirs)
+		underlays += wire_underlays[i]
 
 	if(panel_open)
-		icon_state = icon_state_open
-	else if (broken)
+		if (stat & BROKEN)
+			icon_state = icon_state_openb
+		else
+			icon_state = icon_state_open
+	else if (stat & BROKEN)
 		icon_state = icon_state_broken
-	else if ()
+	else if (use_power == 1)
 		icon_state = icon_state_on
+	else if (use_power == 2)
+		icon_state = icon_state_active
 	else
 		icon_state = icon_state_off
