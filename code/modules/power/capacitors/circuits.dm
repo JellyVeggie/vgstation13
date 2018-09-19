@@ -60,6 +60,7 @@
 	board_type = MACHINE
 	req_components = list(
 		/obj/item/weapon/stock_parts/capacitor = 2,
+		/obj/item/weapon/stock_parts/manipulator = 2,
 		/obj/item/weapon/stock_parts/console_screen = 1,
 		/obj/item/weapon/reagent_containers/glass/beaker = 1)
 

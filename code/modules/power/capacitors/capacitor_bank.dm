@@ -1,6 +1,9 @@
+//"The energy liberated by one gram of TNT was arbitrarily defined as a matter of convention to be 4184 J, which is exactly one kilocalorie."
+#define TNTENERGY 4.18e6 //1 Kg TNT = 4.18 MJ,
+
 /obj/machinery/power/capacitor_bank
 	name = "capacitor bank"
-	desc = "Entire stacks of capacitors to store power with."
+	desc = "Entire stacks of capacitors to store power with. You're not entirely sure capacitors work that way"
 
 	//Icons
 	icon = 'icons/obj/machines/capacitor_bank.dmi'
@@ -44,6 +47,7 @@
 	wire_underlays[SOUTH] = image('icons/obj/machines/capacitor_bank.dmi',icon_state = "wire_us")
 	wire_underlays[EAST]  = image('icons/obj/machines/capacitor_bank.dmi',icon_state = "wire_ue")
 	wire_underlays[WEST]  = image('icons/obj/machines/capacitor_bank.dmi',icon_state = "wire_uw")
+	RefreshParts()
 	state = 1
 	update_icon()
 
@@ -126,7 +130,6 @@
 /obj/machinery/power/capacitor_bank/proc/update_capacity()
 	if (cap_network)
 		cap_network.capacity -= capacity
-	RefreshParts()
 	capacity = actual_capacity - capacity_loss
 	if (cap_network)
 		cap_network.capacity += capacity
@@ -146,7 +149,7 @@
 
 	cap_network.charge = max(cap_network.charge - damage, 0)
 
-	if (!no_explosions && prob(max(100 * (1 + (-6*4.18e6 / (damage + 5*4.18e6))), 0))) //4.18 MJ = 1 Kg TNT. 100% probability to explode on the infinite, starting at 1Kg
+	if (!no_explosions && prob(max(100 * (1 + (-6 * TNTENERGY / (damage + 5 * TNTENERGY))), 0))) //1 Kg TNT = 4.18 MJ
 		explode(damage)
 		capacity_loss = actual_capacity
 	else
@@ -162,8 +165,9 @@
 
 
 /obj/machinery/power/capacitor_bank/proc/explode(var/damage)
-	var/heavy = round(max(3 * (1 + (-6 / (damage + 5))), 0))
-	var/light = 1 + round(max(5 * (1 + (-6 / (damage + 5))), 0))
+	//Pulled these out of my as, don't use them as the basis for a "TNT equivalent" scale
+	var/heavy = round(max(3 * (1 + (-6 * TNTENERGY / (damage + 5 * TNTENERGY))), 0))
+	var/light = 1 + round(max(5 * (1 + (-6 * TNTENERGY / (damage + 5 * TNTENERGY))), 0))
 
 	spark(src, 6)
 	explosion(src, 0, heavy, light, 0)
@@ -224,7 +228,6 @@
 	..()
 
 /obj/machinery/power/capacitor_bank/RefreshParts()
-	//Shamelessly stolen from SMES code
 	actual_capacity = 0
 	for(var/obj/item/weapon/stock_parts/capacitor/C in component_parts)
 		actual_capacity += C.maximum_charge

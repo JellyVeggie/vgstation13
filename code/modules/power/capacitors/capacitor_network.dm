@@ -6,7 +6,7 @@
 	var/safety_limit = 0.5 // How much power the net can hold before machinery starts failing (as percent of capacity, from 0.5 to 0.9)
 	var/safe_capacity = 0
 
-	var/network_safety = 0        // Wether it's safe to disconnect things willy nilly
+	var/network_safety = 0 // Wether it's safe to disconnect things willy nilly
 
 	var/list/obj/machinery/power/capacitor_bank/nodes = list()
 
