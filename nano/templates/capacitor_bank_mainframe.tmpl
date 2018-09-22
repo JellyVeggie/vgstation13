@@ -7,7 +7,7 @@
 					Safe capacity:
 				</div>
 				<div class="statusValue">
-					<div> {{:data.safe_capacity}} J </div>
+					<div> {{:data.safeCapacity}} J </div>
 				</div>
 			</div>
 			<div class="line">
@@ -24,7 +24,7 @@
 		<div class="statusDisplayRecords">
 			<div class="line">
 				<div class="statusLabel"> Charge: </div>
-				{{if data.safe_capacity >= data.charge}}
+				{{if data.safeCapacity >= data.charge}}
 					<div class="statusValue good"> {{:data.charge}} J </div>
 				{{else}}
 					<div class="statusValue bad"> {{:data.charge}} J </div>
@@ -34,12 +34,12 @@
 				<div class="statusLabel"> Charge percent: </div>
 				<div class="statusValue">
 					<div class="displayBar">
-						{{:helper.displayBar(data.charge, 0, data.safe_capacity, data.charge > data.safe_capacity ? "bad" : "good")}}
+						{{:helper.displayBar(data.charge, 0, data.safeCapacity, data.charge > data.safeCapacity ? "bad" : "good")}}
 					</div>
 				</div>
-				<div class="statusValue"> {{:helper.round(100 * data.charge / data.safe_capacity)}}%</div>
+				<div class="statusValue"> {{:helper.round(100 * data.charge / data.safeCapacity)}}%</div>
 			</div>
-			{{if data.charge > data.safe_capacity}}
+			{{if data.charge > data.safeCapacity}}
 				<div class="line">
 					<div class= "statusValue bad">ALERT: Risk of electric discharge</div>
 				</div>				
@@ -57,7 +57,7 @@
 			</div>
 			<div class="line">
 				<div class="statusLabel"> Mainframes: </div>
-				{{if data.mainframes < data.mainframesWated}}
+				{{if data.mainframes < data.mainframesWanted}}
 					<div class="statusValue average"> {{:data.mainframes}} / {{:data.mainframesWanted}} </div>
 				{{else}}
 					<div class="statusValue good"> {{:data.mainframes}} / {{:data.mainframesWanted}} </div>
@@ -65,7 +65,7 @@
 			</div>
 			<div class="line">
 				<div class="statusLabel"> Safe capacity bonus: </div>
-				<div class="statusValue"> {{:data.safeCapacityBonus}} J </div>
+				<div class="statusValue"> {{:helper.round(100 * data.safeCapacityBonus / data.safeCapacity)}}% ({{:data.safeCapacityBonus}} J) </div>
 			</div>
 		</div>
 	</div>

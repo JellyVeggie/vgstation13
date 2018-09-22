@@ -12,12 +12,17 @@
 
 	var/list/obj/machinery/power/capacitor_bank/nodes = list()
 
+
+//--Node operations
+
 /datum/capacitor_network/proc/add_node(var/obj/machinery/power/capacitor_bank/node)
 	node.cap_network = src
 	nodes += node
 	capacity += node.capacity
 	if (node.is_mainframe())
 		mainframes += 1
+	update_safety()
+
 
 /datum/capacitor_network/proc/remove_node(var/obj/machinery/power/capacitor_bank/node, var/force_safety)
 	if (node in nodes)
@@ -27,6 +32,10 @@
 
 		if (node.is_mainframe())
 			mainframes -= 1
+		update_safety()
+
+
+//--Network operations
 
 /datum/capacitor_network/proc/merge_network(var/datum/capacitor_network/network)
 	if (src == network)
@@ -45,13 +54,15 @@
 	N1.charge += N2.charge
 	N1.capacity += N2.capacity
 	N1.mainframes += N2.mainframes
+
 	for (var/obj/machinery/power/capacitor_bank/node in N2.nodes)
 		node.cap_network = N1
 		node.update_capacity()
 	N1.nodes += N2.nodes
+	N1.update_safety()
 
-	N1.update_charge()
 	del N2
+
 
 /datum/capacitor_network/proc/split_from_network(var/list/obj/machinery/power/capacitor_bank/old_nodes)
 	var/datum/capacitor_network/new_network = new /datum/capacitor_network()
@@ -64,8 +75,10 @@
 
 	update_safety()
 	new_network.update_safety()
+
 	charge = old_charge * capacity/old_capacity
 	new_network.charge = old_charge * new_network.capacity/old_capacity
+
 
 /datum/capacitor_network/proc/rebuild_from(var/list/obj/machinery/power/capacitor_bank/seeding_nodes)
 	var/list/obj/machinery/power/capacitor_bank/new_network_nodes //Nodes that will spliter off
@@ -87,6 +100,7 @@
 			node = frontier[1] //Pick a node
 			frontier -= node
 
+			new_neighbors.len = 0
 			for (var/i in node.connected_dirs) //Get the neighbors
 				new_neighbors += node.neighbors[i]
 			new_neighbors -= new_network_nodes //Neighbors we already know about aren't really new
@@ -98,6 +112,8 @@
 		if(seeding_nodes.len > 0)
 			split_from_network(new_network_nodes)
 
+
+//--Update
 
 /datum/capacitor_network/proc/update_safety()
 	safety_limit = base_safety_limit + (max_safety_limit - base_safety_limit) * Clamp((nodes.len ? 10 * mainframes / nodes.len : 0), 0, 1)

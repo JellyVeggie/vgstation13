@@ -231,6 +231,7 @@
 	actual_capacity = 0
 	for(var/obj/item/weapon/stock_parts/capacitor/C in component_parts)
 		actual_capacity += C.maximum_charge
+	update_capacity()
 
 /obj/machinery/power/capacitor_bank/examine(mob/user)
 	..()

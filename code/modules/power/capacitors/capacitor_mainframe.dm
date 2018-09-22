@@ -68,45 +68,6 @@
 		return 0 // Do not update ui
 
 
-	//Override beyond this point
-	/*
-	if( href_list["cmode"] )
-		switch( href_list["cmode"])
-			if("auto")
-				chargemode = BATTERY_AUTO_CHARGE
-			if("manual")
-				chargemode = BATTERY_MANUAL_CHARGE
-			if("off")
-				chargemode = BATTERY_NO_CHARGE
-				charging = 0
-		update_icon()
-
-	else if( href_list["online"] )
-		online = !online
-		update_icon()
-	else if( href_list["input"] )
-		switch( href_list["input"] )
-			if("min")
-				chargelevel = 0
-			if("max")
-				chargelevel = max_input		//30000
-			if("set")
-				chargelevel = input(usr, "Enter new input level (0-[max_input])", "SMES Input Power Control", chargelevel) as num
-		chargelevel = max(0, min(max_input, chargelevel))	// clamp to range
-
-	else if( href_list["output"] )
-		switch( href_list["output"] )
-			if("min")
-				output = 0
-			if("max")
-				output = max_output		//30000
-			if("set")
-				output = input(usr, "Enter new output level (0-[max_output])", "SMES Output Power Control", output) as num
-		output = max(0, min(max_output, output))	// clamp to range
-
-	return 1
-	*/
-
 /////////////////////////////////////////////
 // MAINFRAME
 
@@ -122,6 +83,9 @@ var/global/list/capacitor_bank_mainframe_charge_meter = list(
 /obj/machinery/power/capacitor_bank/nnui/mainframe
 	name = "capacitor mainframe"
 	desc = "Manages and stabilizes any capacitor banks it's been connected to."
+
+	ui_tmpl = "capacitor_bank_mainframe.tmpl" //The .tmpl file used for the UI
+	ui_name = "The Capacitor Mainframe" // The name that'll appear on the UI
 
 	icon_state = "capacitor_bank"
 	icon_state_open = "capacitor_mainframe_open"
@@ -145,82 +109,33 @@ var/global/list/capacitor_bank_mainframe_charge_meter = list(
 /obj/machinery/power/capacitor_bank/nnui/mainframe/get_ui_data()
 	var/data[0]
 	data["hasNetwork"] = cap_network
-	data["charge"] = cap_network.capacity
-	data["capacity"] = cap_network.capacity
-	data["safeCapacity"] = cap_network.safe_capacity
-	data["safeCapacityBonus"] = cap_network.capacity * cap_network.base_safety_limit - cap_network.safe_capacity
-	data["networkSafety"] = cap_network.network_safety
-	data["nodes"] = cap_network.nodes.len
-	data["mainframes"] = cap_network.mainframes
-	data["mainframesWanted"] = -round(-cap_network.nodes.len / 10) //Ceiling(cap_network.nodes.len / 10). THis should be replaced with an actual Ceiling() some day
+	if (cap_network)
+		data["charge"] = cap_network.charge
+		data["capacity"] = cap_network.capacity
+		data["safeCapacity"] = cap_network.safe_capacity
+		data["safeCapacityBonus"] = cap_network.safe_capacity - cap_network.capacity * cap_network.base_safety_limit
+		data["networkSafety"] = cap_network.network_safety
+		data["nodes"] = cap_network.nodes.len
+		data["mainframes"] = cap_network.mainframes
+		data["mainframesWanted"] = -round(-cap_network.nodes.len / 10) //Ceiling(cap_network.nodes.len / 10). THis should be replaced with an actual Ceiling() some day
+	else
+		data["charge"] = 0
+		data["capacity"] = 0
+		data["safeCapacity"] = 0
+		data["safeCapacityBonus"] = 0
+		data["networkSafety"] = 0
+		data["nodes"] = 0
+		data["mainframes"] = 0
+		data["mainframesWanted"] = 0
 
 	return data
-
-/obj/machinery/power/capacitor_bank/nnui/mainframe/Topic(href, href_list)
-	if(..())
-		return 1
-	if(href_list["close"])
-		if(usr.machine == src)
-			usr.unset_machine()
-		return 1
-	if (!isAdminGhost(usr) && (usr.stat || usr.restrained()))
-		return
-	if (!(istype(usr, /mob/living/carbon/human) || ticker) && ticker.mode.name != "monkey")
-		if(!istype(usr, /mob/living/silicon/ai) && !isAdminGhost(usr))
-			to_chat(usr, "<span class='warning'>You don't have the dexterity to do this!</span>")
-			return
-
-	//to_chat(world, "[href] ; [href_list[href]]")
-
-	if (!isturf(src.loc) && !istype(usr, /mob/living/silicon/) && !isAdminGhost(usr))
-		return 0 // Do not update ui
-
-
-	//Override beyond this point
-	/*
-	if( href_list["cmode"] )
-		switch( href_list["cmode"])
-			if("auto")
-				chargemode = BATTERY_AUTO_CHARGE
-			if("manual")
-				chargemode = BATTERY_MANUAL_CHARGE
-			if("off")
-				chargemode = BATTERY_NO_CHARGE
-				charging = 0
-		update_icon()
-
-	else if( href_list["online"] )
-		online = !online
-		update_icon()
-	else if( href_list["input"] )
-		switch( href_list["input"] )
-			if("min")
-				chargelevel = 0
-			if("max")
-				chargelevel = max_input		//30000
-			if("set")
-				chargelevel = input(usr, "Enter new input level (0-[max_input])", "SMES Input Power Control", chargelevel) as num
-		chargelevel = max(0, min(max_input, chargelevel))	// clamp to range
-
-	else if( href_list["output"] )
-		switch( href_list["output"] )
-			if("min")
-				output = 0
-			if("max")
-				output = max_output		//30000
-			if("set")
-				output = input(usr, "Enter new output level (0-[max_output])", "SMES Output Power Control", output) as num
-		output = max(0, min(max_output, output))	// clamp to range
-
-	return 1
-	*/
 
 
 //--Network
 
 /obj/machinery/power/capacitor_bank/nnui/mainframe/proc/charge_level()
 	if(cap_network)
-		var/clevel = max(cap_network.charge/(cap_network.safe_capacity ? cap_network.safe_capacity : 0.1), 0)
+		var/clevel = max(cap_network.charge/(cap_network.safe_capacity ? cap_network.safe_capacity : 0.01), 0)
 		return clevel
 	else
 		return 0
@@ -228,13 +143,13 @@ var/global/list/capacitor_bank_mainframe_charge_meter = list(
 /obj/machinery/power/capacitor_bank/nnui/mainframe/is_mainframe()
 	return !(stat & BROKEN)
 
+
 //--Icon
 
 /obj/machinery/power/capacitor_bank/nnui/mainframe/proc/update_overlay()
+	var/clevel = min(-round(-4 * charge_level()), capacitor_bank_mainframe_charge_meter.len)
 	overlays.len = 0
 
-	var/clevel = round(min(5.5 * charge_level(), capacitor_bank_mainframe_charge_meter.len))
-	clevel = round(min(5.5 * charge_level(), capacitor_bank_mainframe_charge_meter.len))
 	if(clevel > 0)
 		overlays += capacitor_bank_mainframe_charge_meter[clevel]
 
