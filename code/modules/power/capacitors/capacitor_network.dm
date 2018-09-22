@@ -2,9 +2,11 @@
 	var/charge = 0         // How much power the net holds
 	var/capacity = 0       // How much power the net can hold
 
-	var/mainframes = 0     // Mainframes in the net. More mainframes = higher safety limit. 1 out of 10 is ideal
-	var/safety_limit = 0.5 // How much power the net can hold before machinery starts failing (as percent of capacity, from 0.5 to 0.9)
+	var/mainframes = 0 // Mainframes in the net. More mainframes = higher safety limit. 1 out of 10 is ideal
+	var/safety_limit = 0 // How much power the net can hold before machinery starts failing (as percent of capacity, from 0.5 to 0.9)
 	var/safe_capacity = 0
+	var/const/base_safety_limit = 0.5
+	var/const/max_safety_limit = 0.9
 
 	var/network_safety = 0 // Wether it's safe to disconnect things willy nilly
 
@@ -98,7 +100,7 @@
 
 
 /datum/capacitor_network/proc/update_safety()
-	safety_limit = 0.5 + 0.4 * Clamp((nodes.len ? 10 * mainframes / nodes.len : 0), 0, 1)
+	safety_limit = base_safety_limit + (max_safety_limit - base_safety_limit) * Clamp((nodes.len ? 10 * mainframes / nodes.len : 0), 0, 1)
 	safe_capacity = capacity * safety_limit
 
 

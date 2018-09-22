@@ -18,7 +18,7 @@
 	name = "Circuit board (Capacitor mainframe)"
 	desc = "A not so simple circuitboard controlling the capacitor banks on a capacitor network"
 	icon_state = "mainboard"
-	build_path = /obj/machinery/power/capacitor_bank/mainframe
+	build_path = /obj/machinery/power/capacitor_bank/nnui/mainframe
 	origin_tech =  Tc_PROGRAMMING + "=4;" + Tc_ENGINEERING + "=2;" + Tc_POWERSTORAGE + "=3"
 	board_type = MACHINE
 	req_components = list(
@@ -33,6 +33,7 @@
 	qdel(src)
 	return
 
+/*
 //////////////////////////////////////
 // Capacitor Power Input
 
@@ -76,3 +77,4 @@
 	board_type = MACHINE
 	req_components = list(
 		/obj/item/weapon/stock_parts/capacitor = 4)
+*/

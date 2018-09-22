@@ -1,0 +1,85 @@
+{{if data.hasNetwork}}
+	<div class="block">
+		<h3>Capacity</h3>
+		<div class="statusDisplayRecords">
+			<div class="line">
+				<div class="statusLabel">
+					Safe capacity:
+				</div>
+				<div class="statusValue">
+					<div> {{:data.safe_capacity}} J </div>
+				</div>
+			</div>
+			<div class="line">
+				<div class="statusLabel">
+					Max capacity:
+				</div>
+				<div class="statusValue">
+					<div> {{:data.capacity}} J </div>
+				</div>
+			</div>
+		</div>
+		
+		<h3>Charge</h3>
+		<div class="statusDisplayRecords">
+			<div class="line">
+				<div class="statusLabel"> Charge: </div>
+				{{if data.safe_capacity >= data.charge}}
+					<div class="statusValue good"> {{:data.charge}} J </div>
+				{{else}}
+					<div class="statusValue bad"> {{:data.charge}} J </div>
+				{{/if}}
+			</div>
+			<div class="line">
+				<div class="statusLabel"> Charge percent: </div>
+				<div class="statusValue">
+					<div class="displayBar">
+						{{:helper.displayBar(data.charge, 0, data.safe_capacity, data.charge > data.safe_capacity ? "bad" : "good")}}
+					</div>
+				</div>
+				<div class="statusValue"> {{:helper.round(100 * data.charge / data.safe_capacity)}}%</div>
+			</div>
+			{{if data.charge > data.safe_capacity}}
+				<div class="line">
+					<div class= "statusValue bad">ALERT: Risk of electric discharge</div>
+				</div>				
+				<div class="line">
+					<div class= "statusValue average">Please increase capacity or lower charge</div>
+				</div>
+			{{/if}}
+		</div>	
+		
+		<h3>Mainframes</h3>
+		<div class="statusDisplayRecords">
+			<div class="line">
+				<div class="statusLabel"> Nodes: </div>
+				<div class="statusValue"> {{:data.nodes}}</div>
+			</div>
+			<div class="line">
+				<div class="statusLabel"> Mainframes: </div>
+				{{if data.mainframes < data.mainframesWated}}
+					<div class="statusValue average"> {{:data.mainframes}} / {{:data.mainframesWanted}} </div>
+				{{else}}
+					<div class="statusValue good"> {{:data.mainframes}} / {{:data.mainframesWanted}} </div>
+				{{/if}}
+			</div>
+			<div class="line">
+				<div class="statusLabel"> Safe capacity bonus: </div>
+				<div class="statusValue"> {{:data.safeCapacityBonus}} J </div>
+			</div>
+		</div>
+	</div>
+{{else}}
+	<!-- Let's hope this piece of code won't ever pop up -->
+	<div class="block">
+		<h3 class="bad">%$ERROR*#!!!</h3>
+		<div class="statusDisplayRecords">
+			<div class="line">
+				<div class= "statusValue bad">Mainframe not connected to any capacitors.</div>
+			</div>
+			<div class="line">
+				<div class= "statusValue average">Please rebuild and reconnect all machines involved</div>
+			</div>
+		</div>
+	</div>
+{{/if}}

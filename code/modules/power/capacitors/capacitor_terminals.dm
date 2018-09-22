@@ -1,7 +1,7 @@
 /////////////////////////////////////////////
 // TERMINALS
 
-
+/*
 /obj/machinery/power/capacitor_bank/terminal/
 	var/ui_tmpl = "" //The .tmpl file used for the UI
 	var/ui_name = "The Terminal Unit" // The name that'll appear on the UI
@@ -277,3 +277,5 @@
 	)
 
 /obj/machinery/power/capacitor_bank/adapter/update_icon()
+
+*/
