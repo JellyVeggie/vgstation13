@@ -35,7 +35,6 @@
 	var/icon_state_openb = "capacitor_bank_openb"
 	var/icon_state_off = "capacitor_bank"
 	var/icon_state_on = "capacitor_bank_on"
-	var/icon_state_active = "capacitor_bank_on"
 
 	//Machine stuff
 	density = 1
@@ -53,11 +52,13 @@
 /obj/machinery/capacitor_bank/New()
 	..()
 	RefreshParts()
+	anchored = 1
 	state = 1
 	update_icon()
 
 /obj/machinery/capacitor_bank/Destroy()
-	disconnect()
+	if(mDC_node)
+		qdel(mDC_node)
 	..()
 
 
@@ -83,15 +84,16 @@
 
 		CC.use(1)
 		to_chat(user, "<span class='notice'>You wire \the [src].</span>")
+		update_icon()
 
 	if (istype(O, /obj/item/weapon/wirecutters) && mDC_node)
 		if(do_after(user, src, 30))
 
-			del mDC_node
+			qdel(mDC_node)
 
 			getFromPool(/obj/item/stack/cable_coil, get_turf(src), 1)
 			to_chat(user, "<span class='notice'>You cut \the [src]'s wires.</span>")
-
+			update_icon()
 
 /obj/machinery/capacitor_bank/wrenchable()
 	if(mDC_node) //Must not be wired
@@ -124,7 +126,7 @@
 	switch(severity)
 		if(1.0)
 			if (prob(25))
-				explode(capacity)
+				explode(mDC_node.capacity)
 			qdel(src)
 			return
 
@@ -132,21 +134,21 @@
 			if (prob(50))
 				qdel(src)
 			else
-				damage(mDC_node.capacity * (rand(3,10)/10))
+				DC_damage(mDC_node.capacity * (rand(3,10)/10))
 			return
 
 		if(3.0)
 			if (prob(10))
 				qdel(src)
 			else
-				damage(mDC_node.capacity * (rand(0,3)/10))
+				DC_damage(mDC_node.capacity * (rand(0,3)/10))
 			return
 	return
 
 
 /obj/machinery/capacitor_bank/emp_act(severity)
 	var/node_charge = mDC_node.network.charge * mDC_node.capacity / mDC_node.network.capacity
-	damage(node_charge * (rand(1,3)/4))
+	DC_damage(node_charge * (rand(1,3)/4))
 	..()
 
 
@@ -163,6 +165,7 @@
 	underlays.len = 0
 	if(mDC_node)
 		for (var/i in mDC_node.connected_dirs)
+			world.log << "[i], [DC_wire_underlays[i]]"
 			underlays += DC_wire_underlays[i]
 
 	if(panel_open)
@@ -172,14 +175,12 @@
 			icon_state = icon_state_open
 	else if (stat & BROKEN)
 		icon_state = icon_state_broken
-	else if (use_power == 1)
+	else if (mDC_node)
 		icon_state = icon_state_on
-	else if (use_power == 2)
-		icon_state = icon_state_active
 	else
 		icon_state = icon_state_off
 
-
+/*
 /////////////////////////////////////////////
 // NNUI
 /*
@@ -210,7 +211,7 @@
 
 /obj/machinery/power/capacitor_bank/nnui/ui_interact(mob/user, ui_key = "main", var/datum/nanoui/ui = null, var/force_open=NANOUI_FOCUS)
 
-	if(stat & BROKEN || use_power = 0)
+	if(stat & BROKEN || use_power == 0)
 		return
 
 	// This is the data which will be sent to the ui
@@ -245,3 +246,4 @@
 			return
 	if (!isturf(src.loc) && !istype(usr, /mob/living/silicon/) && !isAdminGhost(usr))
 		return 0 // Do not update ui
+*/

@@ -1,7 +1,12 @@
-var/global/list/DC_wire_underlays = list(NORTH = image('icons/obj/machines/dc_network.dmi',icon_state = "wire_un"),
-                                         SOUTH = image('icons/obj/machines/dc_network.dmi',icon_state = "wire_us"),
-                                         EAST  = image('icons/obj/machines/dc_network.dmi',icon_state = "wire_ue"),
-                                         WEST  = image('icons/obj/machines/dc_network.dmi',icon_state = "wire_uw"))
+//TODO: find a nicer way to do this
+var/global/list/DC_wire_underlays = list(1 = image('icons/obj/machines/dc_network.dmi',icon_state = "wire_un"),
+                                         2 = image('icons/obj/machines/dc_network.dmi',icon_state = "wire_us"),
+                                         3 = null,
+                                         4 = image('icons/obj/machines/dc_network.dmi',icon_state = "wire_ue"),
+                                         5 = null,
+                                         6 = null,
+                                         7 = null,
+                                         8 = image('icons/obj/machines/dc_network.dmi',icon_state = "wire_uw"))
 
 /////////////////////////////////////////////////////////////////////////////////////
 // MACHINERY
@@ -67,27 +72,33 @@ var/global/list/DC_wire_underlays = list(NORTH = image('icons/obj/machines/dc_ne
 	var/datum/DC_network/network //The network we belong to
 
 	var/list/connected_dirs = list()
-	var/list/DC_node/neighbors[8] // Nodes we're connected to, and which direction they're in
+	var/list/datum/DC_node/neighbors[8] // Nodes we're connected to, and which direction they're in
 
 
 /datum/DC_node/New(var/obj/machinery/machine)
 	if(!machine) //Can't exist without a host machine!
-		del src
+		qdel(src)
 
 	src.machine = machine
 	machine.mDC_node = src
 
 
 /datum/DC_node/Destroy()
-	disconnect()
-	machine.mDC_node = null
+	if (network)
+		disconnect()
+	else if (neighbors)
+		for(var/dir in connected_dirs)
+			disconnect_from(neighbors[dir], dir)
+
+	if (machine)
+		machine.mDC_node = null
 	..()
 
 
 //-- Network helpers --
 
 /datum/DC_node/proc/is_mainframe()
-	return machine.is_mainframe()
+	return machine.DC_is_mainframe()
 
 
 /datum/DC_node/proc/available_dirs()
@@ -147,7 +158,7 @@ var/global/list/DC_wire_underlays = list(NORTH = image('icons/obj/machines/dc_ne
 
 
 /datum/DC_node/proc/disconnect()
-	var/list/DC_node/old_neighbors = list()
+	var/list/datum/DC_node/old_neighbors = list()
 	var/datum/DC_network/old_network = network
 	network.remove_node(src)
 
@@ -171,9 +182,6 @@ var/global/list/DC_wire_underlays = list(NORTH = image('icons/obj/machines/dc_ne
 
 //-- Damage --
 
-/datum/DC_node/proc/damage(var/damage)
-	machine.DC_can_damage()
-
 /datum/DC_node/proc/do_damage(var/damage)
 	capacity_loss = min(capacity_loss + damage)
 	update_capacity()
@@ -185,10 +193,10 @@ var/global/list/DC_wire_underlays = list(NORTH = image('icons/obj/machines/dc_ne
  *
  */
 /datum/DC_network
-	var/charge = 0         // How much power the net holds
-	var/capacity = 0       // How much power the net can hold
+	var/charge = 0       // How much power the net holds
+	var/capacity = 0     // How much power the net can hold
 
-	var/mainframes = 0 // Mainframes in the net. More mainframes = higher safety limit. 1 out of 10 is ideal
+	var/mainframes = 0   // Mainframes in the net. More mainframes = higher safety limit. 1 out of 10 is ideal
 	var/safety_limit = 0 // How much power the net can hold before machinery starts failing (as percent of capacity, from 0.5 to 0.9)
 	var/safe_capacity = 0
 	var/const/base_safety_limit = 0.5
@@ -196,7 +204,7 @@ var/global/list/DC_wire_underlays = list(NORTH = image('icons/obj/machines/dc_ne
 
 	var/network_safety = 0 // Wether it's safe to disconnect things willy nilly. TODO: Have network damage actually work
 
-	var/list/obj/machinery/power/capacitor_bank/nodes = list()
+	var/list/datum/DC_node/nodes = list()
 
 /datum/DC_network/New(var/datum/DC_node/node)
 	if(node)
@@ -205,10 +213,11 @@ var/global/list/DC_wire_underlays = list(NORTH = image('icons/obj/machines/dc_ne
 /datum/DC_network/Destroy()
 	for (var/datum/DC_node/node in nodes)
 		node.disconnect()
+	..()
 
 //-- Node operations --
 
-/datum/DC_network/proc/add_node(var/obj/machinery/power/capacitor_bank/node)
+/datum/DC_network/proc/add_node(var/datum/DC_node/node)
 	node.network = src
 	nodes += node
 	capacity += node.capacity
@@ -217,7 +226,7 @@ var/global/list/DC_wire_underlays = list(NORTH = image('icons/obj/machines/dc_ne
 	update_safety()
 
 
-/datum/DC_network/proc/remove_node(var/obj/machinery/power/capacitor_bank/node)
+/datum/DC_network/proc/remove_node(var/datum/DC_node/node)
 	if (node in nodes)
 		nodes -= node
 		node.network = null
@@ -249,7 +258,7 @@ var/global/list/DC_wire_underlays = list(NORTH = image('icons/obj/machines/dc_ne
 		N2.remove_node(node)
 		N1.add_node(node)
 
-	del N2
+	qdel(N2)
 
 
 /datum/DC_network/proc/split_from_network(var/list/datum/DC_node/old_nodes)
@@ -310,7 +319,7 @@ var/global/list/DC_wire_underlays = list(NORTH = image('icons/obj/machines/dc_ne
 
 /datum/DC_network/proc/update_charge()
 	if(charge > safe_capacity && prob(100 * charge / safe_capacity - 95))
-		var/datum/DC_node = pick(nodes)
+		var/datum/DC_node/node = pick(nodes)
 		var/damage_multiplier = pick(1;0.1,5;0.2,20;0.3,40;0.4,50;0.5,40;0.6,20;0.7,5;0.8,1;0.9)
 
 		node.machine.DC_damage(charge * damage_multiplier)

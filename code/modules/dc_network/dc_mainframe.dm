@@ -14,16 +14,15 @@ var/global/list/DC_mainframe_charge_meter = list(
 	name = "capacitor mainframe"
 	desc = "Manages and stabilizes any capacitor banks it's been connected to."
 
-	ui_tmpl = "capacitor_bank_mainframe.tmpl" //The .tmpl file used for the UI
-	ui_name = "The Capacitor Mainframe" // The name that'll appear on the UI
+	var/ui_tmpl = "capacitor_bank_mainframe.tmpl" //The .tmpl file used for the UI
+	var/ui_name = "The Capacitor Mainframe" // The name that'll appear on the UI
 
-	icon_state = "capacitor_bank"
+	icon_state = "capacitor_mainframe"
 	icon_state_open = "capacitor_mainframe_open"
 	icon_state_broken = "capacitor_mainframe_broken"
 	icon_state_openb = "capacitor_mainframe_openb"
 	icon_state_off = "capacitor_mainframe"
 	icon_state_on = "capacitor_mainframe_on"
-	icon_state_active = "capacitor_mainframe_on"
 
 	//Machine stuff
 	component_parts = newlist(
@@ -35,20 +34,22 @@ var/global/list/DC_mainframe_charge_meter = list(
 		/obj/item/weapon/stock_parts/console_screen
 	)
 
-//--UI
+//-- UI --
 /obj/machinery/capacitor_bank/mainframe/proc/get_ui_data()
 	var/data[0]
-	data["hasNetwork"] = mDC_node.network
-	if (cap_network)
-		data["charge"] = mDC_node.network.charge
-		data["chargeLevel"] = round(charge_level() * 100,0.1)
-		data["capacity"] = mDC_node.network.capacity
-		data["safeCapacity"] = mDC_node.network.safe_capacity
-		data["safeCapacityBonus"] = mDC_node.network.safe_capacity - mDC_node.network.capacity * mDC_node.network.base_safety_limit
-		data["nodes"] = mDC_node.network.nodes.len
-		data["mainframes"] = mDC_node.network.mainframes
-		data["mainframesWanted"] = -round(mDC_node.network.nodes.len / -10) //Ceiling(mDC_node.network.nodes.len / 10). THis should be replaced with an actual Ceiling() some day
+	if(mDC_node)
+		if(mDC_node.network)
+			data["hasNetwork"] = 1
+			data["charge"] = mDC_node.network.charge
+			data["chargeLevel"] = round(charge_level() * 100,0.1)
+			data["capacity"] = mDC_node.network.capacity
+			data["safeCapacity"] = mDC_node.network.safe_capacity
+			data["safeCapacityBonus"] = mDC_node.network.safe_capacity - mDC_node.network.capacity * mDC_node.network.base_safety_limit
+			data["nodes"] = mDC_node.network.nodes.len
+			data["mainframes"] = mDC_node.network.mainframes
+			data["mainframesWanted"] = -round(mDC_node.network.nodes.len / -10) //Ceiling(mDC_node.network.nodes.len / 10). THis should be replaced with an actual Ceiling() some day
 	else
+		data["hasNetwork"] = 0
 		data["charge"] = 0
 		data["capacity"] = 0
 		data["chargeLevel"] = 0
@@ -61,21 +62,73 @@ var/global/list/DC_mainframe_charge_meter = list(
 	return data
 
 
-//--Network
+//-- UI Overrides --
+
+/obj/machinery/capacitor_bank/mainframe/attack_ai(mob/user)
+	src.add_hiddenprint(user)
+	add_fingerprint(user)
+	ui_interact(user)
+
+
+/obj/machinery/capacitor_bank/mainframe/attack_hand(mob/user)
+	add_fingerprint(user)
+	ui_interact(user)
+
+
+/obj/machinery/capacitor_bank/mainframe/ui_interact(mob/user, ui_key = "main", var/datum/nanoui/ui = null, var/force_open=NANOUI_FOCUS)
+
+	if(stat & BROKEN)
+		return
+
+	// This is the data which will be sent to the ui
+	var/list/data = get_ui_data()
+
+	// Update the ui if it exists, returns null if no ui is passed/found
+	ui = nanomanager.try_update_ui(user, src, ui_key, ui, data, force_open)
+	if (!ui)
+		// The ui does not exist, so we'll create a new() one
+        // For a list of parameters and their descriptions see the code docs in \code\modules\nano\nanoui.dm
+		ui = new(user, src, ui_key, ui_tmpl, ui_name, 540, 380)
+		// When the ui is first opened this is the data it will use
+		ui.set_initial_data(data)
+		// Open the new ui window
+		ui.open()
+		// Auto update every Master Controller tick
+		ui.set_auto_update(1)
+
+
+/obj/machinery/capacitor_bank/mainframe/Topic(href, href_list)
+	if(..())
+		return 1
+	if(href_list["close"])
+		if(usr.machine == src)
+			usr.unset_machine()
+		return 1
+	if (!isAdminGhost(usr) && (usr.stat || usr.restrained()))
+		return
+	if (!(istype(usr, /mob/living/carbon/human) || ticker) && ticker.mode.name != "monkey")
+		if(!istype(usr, /mob/living/silicon/ai) && !isAdminGhost(usr))
+			to_chat(usr, "<span class='warning'>You don't have the dexterity to do this!</span>")
+			return
+	if (!isturf(src.loc) && !istype(usr, /mob/living/silicon/) && !isAdminGhost(usr))
+		return 0 // Do not update ui
+
+
+//-- Network --
 
 /obj/machinery/capacitor_bank/mainframe/proc/charge_level()
-	if(mDC_node.network)
-		var/clevel = max(mDC_node.network.charge/(mDC_node.network.safe_capacity ? mDC_node.network.safe_capacity : 0.01), 0)
-		return clevel
-	else
-		return 0
+	if(mDC_node)
+		if(mDC_node.network)
+			return max(mDC_node.network.charge/(mDC_node.network.safe_capacity ? mDC_node.network.safe_capacity : 0.01), 0)
+	return 0
 
 
-/obj/machinery/capacitor_bank/mainframe/is_mainframe()
+//-- Network Overrides --
+/obj/machinery/capacitor_bank/mainframe/DC_is_mainframe()
 	return !(stat & BROKEN)
 
-//--Icon
 
+//-- Icon OVerrides --
 /obj/machinery/capacitor_bank/mainframe/proc/update_overlay()
 	var/clevel = min(-round(-4 * charge_level()), DC_mainframe_charge_meter.len)
 	overlays.len = 0
@@ -84,7 +137,7 @@ var/global/list/DC_mainframe_charge_meter = list(
 		overlays += DC_mainframe_charge_meter[clevel]
 
 	if (clevel > 1)
-		overlays += image('icons/obj/machines/capacitor_bank.dmi', "capacitor_mainframe-ow")
+		overlays += image('icons/obj/machines/dc_network.dmi', "capacitor_mainframe-ow")
 
 
 /obj/machinery/capacitor_bank/mainframe/update_icon()
@@ -92,14 +145,15 @@ var/global/list/DC_mainframe_charge_meter = list(
 	update_overlay()
 
 
-//--Overrides
+/obj/machinery/capacitor_bank/mainframe/examine(mob/user)
+	..()
+	if(mDC_node)
+		if(mDC_node.network)
+			to_chat(user, "<span class='notice'>The charge meter reads: [round(charge_level() * 100,0.1)]% ([mDC_node.network.charge] J).</span>")
+
+
+//-- Machine Overrides
 
 //TODO: Kinda wasteful, should tie it to events and stuff at some point
 /obj/machinery/capacitor_bank/mainframe/process()
 	update_overlay()
-
-
-/obj/machinery/capacitor_bank/mainframe/examine(mob/user)
-	..()
-	if(mDC_node.network)
-		to_chat(user, "<span class='notice'>The charge meter reads: [round(charge_level() * 100,0.1)]% ([network.charge] J).</span>")

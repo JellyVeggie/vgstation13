@@ -1,6 +1,6 @@
 {{if data.hasNetwork}}
 	<h3>Capacity</h3>
-	<div class="block">
+	<div class="statusDisplay">
 		<div class="item">
 			<div class="itemLabel">
 				Safe capacity:
@@ -20,7 +20,7 @@
 	</div>
 	
 	<h3>Charge</h3>
-	<div class="block">
+	<div class="statusDisplay">
 		<div class="item">
 			<div class="itemLabel"> Charge: </div>
 			{{if data.safeCapacity >= data.charge}}
@@ -43,11 +43,12 @@
 		<div class="item">
 			<div class= "itemValue average"><i>Please increase capacity or lower charge</i></div>
 		</div>
-	</div>
+	
 	{{/if}}
+	</div>
 	
 	<h3>Mainframes</h3>
-	<div class="block">
+	<div class="statusDisplay">
 		<div class="item">
 			<div class="itemLabel"> Nodes: </div>
 			<div class="itemValue"> {{:data.nodes}}</div>
@@ -67,7 +68,7 @@
 		</div>
 {{else}}
 	<h3 class="bad">%$ERROR*#!!!</h3>
-	<div class="block">
+	<div class="statusDisplay">
 		<div class="item">
 			<div class= "itemValue bad"><i>Mainframe not connected to any network.</i></div>
 		</div>

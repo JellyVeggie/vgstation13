@@ -1,6 +1,6 @@
-<div class="block">
+<div class="statusDisplay">
 	<h3>Power</h3>
-	<div class="block">
+	<div class="statusDisplay">
 		<div class="line">
 			 {{:helper.link('On', null, {'active' : 1}, data.active ? 'selected' : null)}}
 			 {{:helper.link('Off', null, {'active' : 0}, data.active ? null : 'selected')}}
@@ -21,7 +21,7 @@
 	</div>
 	
 	<h3>Torque</h3>
-	<div class="block">
+	<div class="statusDisplay">
 		<div class="line">
 			<div class="statusLabel"> Input: </div>
 			<div class="statusValue"> {{:data.tinput}} Nm </div>
@@ -44,7 +44,7 @@
 		{{/if}}
 	</div>
 	<h3>Damage</h3>
-	<div class="block">
+	<div class="statusDisplay">
 		<div class="line">
 			<div class="statusLabel"> Stress: </div>
 			<div class="statusValue">
@@ -78,7 +78,7 @@
 	</div>	
 	
 	<h3>Reagents</h3>
-	<div class="block">
+	<div class="statusDisplay">
 		<div class="line">
 			 {{:helper.link('On', null, {'active' : 1}, data.active ? 'selected' : null)}}
 			 {{:helper.link('Off', null, {'active' : 0}, data.active ? null : 'selected')}}
