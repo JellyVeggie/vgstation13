@@ -1,0 +1,139 @@
+<div class="block">
+	<h3>Power</h3>
+	<div class="block">
+		<div class="line">
+			 {{:helper.link('On', null, {'active' : 1}, data.active ? 'selected' : null)}}
+			 {{:helper.link('Off', null, {'active' : 0}, data.active ? null : 'selected')}}
+			 {{:helper.link('Set output', null, {{'output' : 'auto')}}
+		</div>
+		<div class="line">
+			<div class="statusLabel"> Input: </div>
+			<div class="statusValue"> {{:data.input}} W </div>
+		</div>
+		<div class="line">
+			<div class="statusLabel"> Output: </div>
+			<div class="statusValue"> {{:data.output}} W </div>
+		</div>
+		<div class="line">
+			<div class="statusLabel"> Efficiency: </div>
+			<div class="statusValue"> {{:data.efficiency}}% </div>
+		</div>
+	</div>
+	
+	<h3>Torque</h3>
+	<div class="block">
+		<div class="line">
+			<div class="statusLabel"> Input: </div>
+			<div class="statusValue"> {{:data.tinput}} Nm </div>
+		</div>
+		<div class="line">
+			<div class="statusLabel"> Output: </div>
+			<div class="statusValue"> {{:data.toutput}} Nm </div>
+		</div>
+		<div class="line">
+			<div class="statusLabel"> Difference: </div>
+		{{if data.tdiff < data.maxtdiff}}
+			<div class="statusValue good"> {{:data.tdiff}} Nm / {{:data.maxtdiff}} Nm   </div>
+		</div>
+		{{else}}
+			<div class="statusValue average"> {{:data.tdiff}} Nm / {{:data.maxtdiff}} Nm   </div>
+		</div>
+		<div class="line">
+			<div class= "statusValue average"><i>WARNING: Torque difference too high, shaft will be exposed to stress while active</i></div>
+		</div>
+		{{/if}}
+	</div>
+	<h3>Damage</h3>
+	<div class="block">
+		<div class="line">
+			<div class="statusLabel"> Stress: </div>
+			<div class="statusValue">
+				{{:helper.displayBar(data.stress, 0, 100, data.stress >= 75 ? "bad" : "average")}}
+			</div>
+			<div class="statusValue">{{:data.stress}}%</div>
+		</div>
+		{{if data.stressPercent >= 75}}
+			<div class="line">
+				<div class= "statusValue bad"><i>ALERT: Shaft stress reaching breaking point</i></div>
+			</div>
+			<div class="line">
+				<div class= "statusValue average"><i>Please reduce torque and repair accumulated damage</i></div>
+			</div>
+		{{/if}}
+		<div class="line">
+			<div class="statusLabel"> Carbon build-up: </div>
+			<div class="statusValue">
+				{{:helper.displayBar(data.carbon, 0, 100, data.carbon >= 50 ? "bad" : "average")}}
+			</div>
+			<div class="statusValue">{{:data.carbon}}%</div>
+		</div>
+		{{if data.stressPercent >= 50}}
+			<div class="line">
+				<div class= "statusValue bad"><i>ALERT: Carbon dust levels too high, flash-over possible</i></div>
+			</div>
+			<div class="line">
+				<div class= "statusValue average"><i>Please clean excess carbon dust</i></div>
+			</div>
+		{{/if}}
+	</div>	
+	
+	<h3>Reagents</h3>
+	<div class="block">
+		<div class="line">
+			 {{:helper.link('On', null, {'active' : 1}, data.active ? 'selected' : null)}}
+			 {{:helper.link('Off', null, {'active' : 0}, data.active ? null : 'selected')}}
+			 {{:helper.link('Set output', null, {{'output' : 'auto')}}
+		</div>
+		<div class="line">
+			<div class="statusLabel"> Capacity: </div>
+				<div class="statusValue">
+					{{:helper.displayBar(data.reagents. / data.reagents., 0, 1, "good")}}
+				</div>
+				<div class="statusValue">{{:data.reagents.}}u / {{:data.reagents.}}u</div>
+			</div>
+			<div class="line">
+				<div class="statusLabel"> Usage rate: </div>
+				<div class="statusValue"> 1u </div>
+			</div>
+			<div class="line">
+				<div class="statusLabel"> Reagents: </div>
+				{{if data.reagents.length}}
+				<div class="statusValue">
+					<table>
+					<tbody>
+						<tr>
+							<td>Lube:</td>
+							<td>30u</td>
+						</tr>
+						<tr>
+							<td>Ethanol:</td>
+							<td>3u</td>
+						</tr>
+						<tr>
+							<td>Blood:</td>
+							<td>50u</td>
+						</tr>
+					</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+
+{{if data.reagents.length}}
+	<table>
+		<tbody>
+		{{for data.reagents}}
+			<tr>
+				<td>{{:value.name}}:</td>
+				<td>{{:value.volume}}u</td>
+			</tr>
+		{{/for}}
+		</tbody>
+	</table>
+{{else}}
+	None
+{{/if}}
+
