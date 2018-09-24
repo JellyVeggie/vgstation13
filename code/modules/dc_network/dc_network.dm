@@ -1,7 +1,7 @@
-var/global/list/DC_wire_underlays = list(NORTH = image('icons/obj/machines/capacitor_bank.dmi',icon_state = "wire_un"),
-                                         SOUTH = image('icons/obj/machines/capacitor_bank.dmi',icon_state = "wire_us"),
-                                         EAST  = image('icons/obj/machines/capacitor_bank.dmi',icon_state = "wire_ue"),
-                                         WEST  = image('icons/obj/machines/capacitor_bank.dmi',icon_state = "wire_uw"))
+var/global/list/DC_wire_underlays = list(NORTH = image('icons/obj/machines/dc_network.dmi',icon_state = "wire_un"),
+                                         SOUTH = image('icons/obj/machines/dc_network.dmi',icon_state = "wire_us"),
+                                         EAST  = image('icons/obj/machines/dc_network.dmi',icon_state = "wire_ue"),
+                                         WEST  = image('icons/obj/machines/dc_network.dmi',icon_state = "wire_uw"))
 
 /////////////////////////////////////////////////////////////////////////////////////
 // MACHINERY

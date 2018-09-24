@@ -28,7 +28,7 @@
 	desc = "Entire stacks of capacitors to store power with. You're not entirely sure capacitors work that way"
 
 	//Icons
-	icon = 'icons/obj/machines/capacitor_bank.dmi'
+	icon = 'icons/obj/machines/dc_network.dmi'
 	icon_state = "capacitor_bank"
 	icon_state_open = "capacitor_bank_open"
 	var/icon_state_broken = "capacitor_bank_broken"

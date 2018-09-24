@@ -5,7 +5,7 @@
 	name = "Circuit board (Capacitor bank)"
 	desc = "A simple circuitboard controlling the capacitor stacks on a capacitor bank. You could vastly improve it using a solder"
 	icon_state = "cyborg_upgrade2"
-	build_path = /obj/machinery/power/capacitor_bank
+	build_path = /obj/machinery/capacitor_bank
 	origin_tech =  Tc_PROGRAMMING + "=2;" + Tc_ENGINEERING + "=2;" + Tc_POWERSTORAGE + "=3"
 	board_type = MACHINE
 	req_components = list(
@@ -18,11 +18,11 @@
 	name = "Circuit board (Capacitor mainframe)"
 	desc = "A not so simple circuitboard controlling the capacitor banks on a capacitor network"
 	icon_state = "mainboard"
-	build_path = /obj/machinery/power/capacitor_bank/nnui/mainframe
+	build_path = /obj/machinery/capacitor_bank/mainframe
 	origin_tech =  Tc_PROGRAMMING + "=4;" + Tc_ENGINEERING + "=2;" + Tc_POWERSTORAGE + "=3"
 	board_type = MACHINE
 	req_components = list(
-		/obj/item/weapon/stock_parts/capacitor = 4,
+		/obj/item/weapon/stock_parts/capacitor = 2,
 		/obj/item/weapon/stock_parts/console_screen = 1)
 
 // Getting the board

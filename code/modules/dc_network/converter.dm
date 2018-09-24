@@ -1,4 +1,4 @@
-/////////////////////////////////////////////
+/*/////////////////////////////////////////////
 // CONVERTER
 /*
  * These will exchange charge and power between the capacitor network and the power network
@@ -398,4 +398,5 @@
 
 /obj/machinery/power/capacitor_bank/adapter/update_icon()
 
+*/
 */

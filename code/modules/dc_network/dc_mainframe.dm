@@ -2,11 +2,11 @@
 // MAINFRAME
 
 var/global/list/DC_mainframe_charge_meter = list(
-		image('icons/obj/machines/capacitor_bank.dmi', "capacitor_mainframe-og1"),
-		image('icons/obj/machines/capacitor_bank.dmi', "capacitor_mainframe-og2"),
-		image('icons/obj/machines/capacitor_bank.dmi', "capacitor_mainframe-og3"),
-		image('icons/obj/machines/capacitor_bank.dmi', "capacitor_mainframe-og4"),
-		image('icons/obj/machines/capacitor_bank.dmi', "capacitor_mainframe-og5")
+		image('icons/obj/machines/dc_network.dmi', "capacitor_mainframe-og1"),
+		image('icons/obj/machines/dc_network.dmi', "capacitor_mainframe-og2"),
+		image('icons/obj/machines/dc_network.dmi', "capacitor_mainframe-og3"),
+		image('icons/obj/machines/dc_network.dmi', "capacitor_mainframe-og4"),
+		image('icons/obj/machines/dc_network.dmi', "capacitor_mainframe-og5")
 	)
 
 
