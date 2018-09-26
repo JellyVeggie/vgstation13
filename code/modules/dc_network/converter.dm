@@ -1,189 +1,191 @@
-/*/////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
 // CONVERTER
 /*
- * These will exchange charge and power between the capacitor network and the power network
- * Per Wikipedia: "Rotary converters were made obsolete by mercury arc rectifiers in the 1930s and later on by semiconductor rectifiers in the 1960s"
- * Rotary converters can exchange the most power, but they're big, require decent ammounts of lube to improve their efficiency, break if pushed too
- *  far, and only control how much goes in or out
- * Mercury arc converters exchange less, but are still better than an SMES. They only need a small ammount of mercury to work, and let you set a maximum charge,
- *  but are susceptible to the effects of excess charge and consume APC power to operate
- * Semiconductor converters need no maintenance or power and let you set a maximum charge, but exchange less power than an SMES and are susceptible to the
- *  effects of excess charge. They're boring as fuck, too
+ * These bridge the gap across electric networks, wether dc_networks, powernets, or (usually) a dc_network and a powernet
  *
  */
 
-/obj/machinery/power/capacitor_bank/nnui/converter
-	//var/reagent = 0 //Lube, mercury, or whatever the machine needs to function.
+#define DCINPUT 1
+#define ACINPUT 2
+#define DCOUTPUT 4
+#define ACOUTPUT 8
 
-/obj/machinery/power/capacitor_bank/nnui/converter/power_interact()
-	return
+/obj/machinery/power/converter/
+	//Icons
+	var/icon_state_broken = ""
+	var/icon_state_openb = ""
+	var/icon_state_off = ""
+	var/icon_state_on = ""
 
-
-/obj/machinery/power/capacitor_bank/nnui/converter/capacitor_interact()
-	return
-
-
-//--Overrides
-/obj/machinery/power/capacitor_bank/nnui/converter/process()
-	if (use_power = 2 && cap_network && !(stat & (BROKEN | EMPED)))
-		power_interact()
-
-
-/obj/machinery/power/capacitor_bank/nnui/converter/damage(damage)
-	return
-
-
-/obj/machinery/power/capacitor_bank/nnui/converter/explode(var/damage=0)
-	if(cap_network)
-		disconnect()
-	stat |= BROKEN
-	use_power = 0
-	update_icon()
-	return
-
-
-/obj/machinery/power/capacitor_bank/nnui/converter/ex_act(severity)
-	switch(severity)
-		if(1.0)
-			if (prob(25))
-				explode()
-			qdel(src)
-			return
-
-		if(2.0)
-			if (prob(50))
-				qdel(src)
-			else if (prob(50))
-				explode()
-			return
-
-		if(3.0)
-			if (prob(50))
-				explode()
-			else if (prob(20))
-				qdel(src)
-			return
-	return
-
-///////////////////////////////////////////////////////////////////////
-
-///////////////////////////////////////////////////////////////////////
-
-///////////////////////////////////////////////////////////////////////
-
-///////////////////////////////////////////////////////////////////////
-//ROTARY CONVERTER
-
-/obj/machinery/power/capacitor_bank/nnui/converter/rotary
-	name = "Rotary Universal Motor"
-	desc = "Can use either AC or DC to drive the shaft"
-
-	icon_state = "rotaryM"
-	icon_state_open = "rotaryM_open"
-	icon_state_broken = "rotaryM_broken"
-	icon_state_openb = "rotaryM_openb"
-	icon_state_off = "rotaryM"
-	icon_state_on = "rotaryM_on"
-	icon_state_active = "rotaryM_active"
-
-	var/target_output = 0 // How many watts we want the generator to produce. Governs pretty much everything else
-	var/target_input = 0  // Given an output and efficiency, how many watts we should consume to produce the desired output
-	var/input = 0         // Current energy consumption, smotthly rising to target_input
-	var/output = 0        // Current energy ouput, as calculated from efficiency and current input
-
-	var/const/frequency = 50       // I'm choosing a 50Hz frequency so that the torque figures look nicer
-	var/torque_input = 0           // Torque produced by input on the motor, measured in Nm
-	var/torque = 0                 // Torque required by output on the generator, measured in Nm
-	var/torque_diff = 0            // torque_input - torque. This is what friction and the shaft ate up along the way
-	var/torque_max_diff = 14000000 // The shaft can only take so much excess torque before it suffers from it, causing stress
-	                               //  This effectively limits the maximum output. TODO: Balance
-
-	var/stress = 0            // Current stress suffered from torque_diff, as a percent
-	var/stress_cumulative = 0 // Accumulated stress from previous stressful episodes, as a percent
-	var/stress_total = 0      // stress + stress_cumulative. If this reaches 100% the rotary will break
-
-	var/efficiency = 0         // Determines target_input, input and torque_diff
-	var/base_efficiency = 0.75 // Efficiency before applying lube or whatever magic reagent
-	var/min_efficiency = 0.50  // Higher torque -> Lower efficiency
-	var/max_efficiency = 0.95  // Hogher lube rate -> Hogher efficiency
-
-	var/datum/reagents/reagents = new /datum/reagents(100) // Holds lube, ethanol, and whatever else you feed it
-	var/lube_rate = 0         // How much lube we consume every tick
-	var/carbon_dust = 0       // Carbon dust percent. Higher than 50% and you'll have a (carbon - 50)% probability of
-	                          //  flash-overs, which cause input spikes. Clean it out with ethanol
-	var/carbon_per_torque = 0 // Carbon produced per torque Nm. Carbon comes from the carbon brushes on the generator, .
-	var/carbon_per_lube = 0   //
-
-	var/DC_mode = 0 // Connect to DC (capacitor) networks. If not, connects to AC (powernet)
+	//UI
+	var/ui_tmpl = "capacitor_bank_mainframe.tmpl" //The .tmpl file used for the UI
+	var/ui_name = "The Capacitor Mainframe" // The name that'll appear on the UI
 
 	//Machine stuff
-	//TODO: Circuit board
-	component_parts = newlist(
-		/obj/item/weapon/circuitboard/capacitor_bank/mainframe,
-		/obj/item/weapon/stock_parts/capacitor,
-		/obj/item/weapon/stock_parts/capacitor,
-		/obj/item/weapon/stock_parts/console_screen,
-		/obj/item/weapon/reagent_containers/glass/beaker
-	)
-//--Power
+	density = 1
+	machine_flags = SCREWTOGGLE | CROWDESTROY | FIXED2WORK | WRENCHMOVE
+
+	//Converter stuff
+	var/active = 0 // Wether we're transferring power or not
+
+	var/output = 0 // How much we've actually outputted
+	var/input = 0  // How much we've actually drawn
+	var/target_output = 0 // How much we want to output
+	var/target_input = 0  // How much we should draw to meet the output, accounting for efficiency
+	var/efficiency = 1
+
+	var/available_modes_flags = 0 //Use DCINPUT, ACINPUT, DCOUTPUT and ACOUTPUT to control wether you can wire it to DC/add terminals
+	var/DC_input = 0  // USe these to determine wether you're drawing from/outputting to AC or DC, for when the machine lets you choose
+	var/DC_output = 0
+
+/obj/machinery/power/converter/New()
+	..()
+	RefreshParts()
+	anchored = 1
+	state = 1
+	update_icon()
+
+/obj/machinery/capacitor_bank/Destroy()
+	if(mDC_node)
+		qdel(mDC_node)
+	..()
+
+//-- Helpers --
+//Should come handy for playing sounds, animations, or whatever
+/obj/machinery/power/converter/proc/toggle_active()
+	active = !active
+
+//Checks wether we can proceed with the power_transfer()
+/obj/machinery/power/converter/proc/working_input()
+	return DC_input && get_DCnet() || !DC_input && terminal
+
+//Checks wether we can proceed with the power_transfer()
+/obj/machinery/power/converter/proc/working_output()
+	return DC_input && get_DCnet() || !DC_input && get_powernet()
+
+
+/obj/machinery/power/converter/proc/set_output(var/output)
+	target_output = output
+	target_input = target_output * (2 - efficiency)
+
+
+//-- Power network Overrides --
+/obj/machinery/power/converter/surplus()
+	if(terminal)
+		return terminal.surplus()
+	return 0
+
+/obj/machinery/power/converter/add_load(var/amount)
+	if(terminal)
+		terminal.add_load(amount)
+
+//-- Power Transfer --
+/obj/machinery/power/converter/proc/get_DC_input(var/input)
+	var/datum/DC_network/net = get_DCnet()
+	if(net)
+		input = Clamp(input, 0, net.charge)
+		net.add_charge(-input)
+		return input
+	return 0
+
+
+/obj/machinery/power/converter/proc/get_AC_input(var/input)
+	var/excess = surplus()
+	if(excess > 0)
+		input = min(excess, target_input)
+		add_load(input)
+		return input
+	return 0
+
+
+/obj/machinery/power/converter/proc/do_DC_output(var/output)
+	var/datum/DC_network/net = get_DCnet()
+	if(net)
+		net.add_charge(output)
+		return output
+	return 0
+
+
+/obj/machinery/power/converter/proc/do_AC_output(var/output)
+	add_avail(output)
+	return output
+
+
+/obj/machinery/power/converter/proc/power_transfer()
+	if(!(working_input() && working_output()))
+		toggle_active()
+		return
+
+	input = (DC_input ? get_DC_input(target_input) : get_AC_input(target_input))
+	output = (DC_output ? do_DC_output(input) : do_AC_output(input))
+
+
+//-- Machine Overrides --
+/obj/machinery/power/converter/process()
+	if(active)
+		power_transfer()
+	return
+
+
+//-- Interact --
+/obj/machinery/power/converter/proc/attackby_Terminal(var/obj/item/weapon/W as obj, var/mob/user as mob)
+	if(iscrowbar(W) && terminal)
+		to_chat(user, "<span class='warning'>You must first cut the terminal from the [src]!</span>")
+		return 1
+
+	if(istype(W, /obj/item/stack/cable_coil) && !terminal)
+		var/obj/item/stack/cable_coil/CC = W
+
+		if (CC.amount < 10)
+			to_chat(user, "<span class='warning'>You need 10 length cable coil to make a terminal.</span>")
+			return
+
+		if(make_terminal(user))
+			CC.use(10)
+			terminal.connect_to_network()
+
+			user.visible_message(\
+				"<span class='warning'>[user.name] made a terminal for the [src].</span>",\
+				"You made a terminal for the [src].")
+			src.stat = 0
+			return 1
+
+	else if(iswirecutter(W) && terminal)
+		var/turf/T = get_turf(terminal)
+		if(T.intact)
+			to_chat(user, "<span class='warning'>You must remove the floor plating above the terminal first.</span>")
+			return
+		to_chat(user, "You begin to dismantle the [src]'s terminal...")
+		playsound(src, 'sound/items/Deconstruct.ogg', 50, 1)
+		if (do_after(user, src, 50) && panel_open && terminal && !T.intact)
+			if (prob(50) && electrocute_mob(usr, terminal.get_powernet(), terminal))
+				spark(src, 5)
+				return
+			getFromPool(/obj/item/stack/cable_coil, get_turf(src), 10)
+			user.visible_message(\
+				"<span class='warning'>[user.name] cut the cables and dismantled the power terminal.</span>",\
+				"You cut the cables and dismantle the power terminal.")
+			qdel(terminal)
+			terminal = null
+
+
+/obj/machinery/power/converter/proc/attackby_DC(var/obj/item/weapon/W as obj, var/mob/user as mob)
 
 
 
-//--UI
+//-- Interact Overrides --
 
-/obj/machinery/power/capacitor_bank/nnui/converter/rotary/proc/get_ui_data()
-	var/data[0]
-	data["input"] = input
-	data["output"] = output
-	data["efficiency"] = efficiency
-	data["active"] = use_power == 2
-	data["tinput"] = torque_input
-	data["toutput"] = torque
-	data["tdiff"] = torque_diff
-	data["maxtdiff"] = torque_max_diff
-	data["stress"] = round(min(stress + stress_cumulative, 1) * 100)
-	data["carbon"] = round(carbon * 100)
-	data["reagents"] = reagents.reaget_list
-	data["lubeRate"] = lube_rate
-	data["lubeMinutes"] = 0
-	return data
-
-//--Overrides
-
-/obj/machinery/power/capacitor_bank/nnui/converter/rotary/available_dirs()
-	if(DC_mode)
-		return ..() - dir
-	else
-		return list()
-
-
-/obj/machinery/power/capacitor_bank/nnui/converter/rotary/proc/can_attach_terminal(mob/user)
-	return user.loc != src.loc && (get_dir(user, src) in (cardinal - dir)) && !terminal
-
-
-/obj/machinery/power/capacitor_bank/nnui/converter/rotary/process()
-	if (use_power = 2 && !(stat & (BROKEN)))
-		if(DC_mode && cap_network)
-			capacitor_interact()
-		else if()
-			power_interact()
-
-
-/obj/machinery/power/capacitor_bank/nnui/converter/rotary/attackby(var/obj/item/weapon/W as obj, var/mob/user as mob)
-	if(panel_open && !DC_mode)
-		//Deconstruct
-		//Shamelessly copy pasted from SMES code (Last PR was #19741 at the time)
+/obj/machinery/power/converter/attackby(var/obj/item/weapon/W as obj, var/mob/user as mob) //these can only be moved by being reconstructed, solves having to remake the powernet.
+	if(panel_open && available_modes_flags & ACINPUT)
 		if(iscrowbar(W) && terminal)
 			to_chat(user, "<span class='warning'>You must first cut the terminal from the [src]!</span>")
 			return 1
 
-		//Add Terminal
-		//(Shamelessly copy pasted from SMES code, too (Last PR was #19741 at the time))
 		if(istype(W, /obj/item/stack/cable_coil) && !terminal)
 			var/obj/item/stack/cable_coil/CC = W
 
 			if (CC.amount < 10)
-				to_chat(user, "<span class=\"warning\">You need 10 length cable coil to make a terminal.</span>")
+				to_chat(user, "<span class='warning'>You need 10 length cable coil to make a terminal.</span>")
 				return
 
 			if(make_terminal(user))
@@ -196,15 +198,12 @@
 				src.stat = 0
 				return 1
 
-		// Remove Terminal
-		//(Shamelessly copy pasted from SMES code, again (Last PR was #19741 at the time))
 		else if(iswirecutter(W) && terminal)
 			var/turf/T = get_turf(terminal)
-
 			if(T.intact)
-				to_chat(user, "<span class='warning'>You must remove the floor plating in front of the SMES first.</span>")
+				to_chat(user, "<span class='warning'>You must remove the floor plating above the terminal first.</span>")
 				return
-			to_chat(user, "You begin to dismantle the [src] terminal...")
+			to_chat(user, "You begin to dismantle the [src]'s terminal...")
 			playsound(src, 'sound/items/Deconstruct.ogg', 50, 1)
 			if (do_after(user, src, 50) && panel_open && terminal && !T.intact)
 				if (prob(50) && electrocute_mob(usr, terminal.get_powernet(), terminal))
@@ -216,187 +215,336 @@
 					"You cut the cables and dismantle the power terminal.")
 				qdel(terminal)
 				terminal = null
+	if (available_modes_flags & DCINPUT || available_modes_flags & DCOUTPUT)
+		if (istype(W, /obj/item/stack/cable_coil) && !mDC_node && state)
+			var/obj/item/stack/cable_coil/CC = W
+			if (CC.amount < 1)
+				to_chat(user, "<span class=\"warning\">You need 1 length cable coil to wire the [src].</span>") //Should never happen, but who knows
+				return
 
-	// Repair
-	if(stat | BROKEN && iswelder(W))
-		var/obj/item/weapon/weldingtool/WT = W
-		if(!WT.remove_fuel(0, user))
-			to_chat(user, "<span class='notice'>You need more welding fuel to complete this task.</span>")
+			mDC_node = new /datum/DC_node(src)
+			RefreshParts()
+			mDC_node.connect()
+
+			CC.use(1)
+			to_chat(user, "<span class='notice'>You wire \the [src].</span>")
+			update_icon()
 			return
 
-		user.visible_message(\
-			"<span class='notice'>[user.name] starts repairing the [src].</span>",\
-			"You start repairing the [src].")
-			playsound(src, 'sound/items/Welder.ogg', 50, 1)
-		if (do_after(user, src, 50))
-			user.visible_message(\
-				playsound(src, 'sound/items/Welder2.ogg', 50, 1)
-				"<span class='notice'>[user.name] has repaired the [src].</span>",\
-				"You have repaired the [src].")
+		if (istype(W, /obj/item/weapon/wirecutters) && mDC_node)
+			if(do_after(user, src, 30))
+				qdel(mDC_node)
+
+				getFromPool(/obj/item/stack/cable_coil, get_turf(src), 1)
+				to_chat(user, "<span class='notice'>You cut \the [src]'s wires.</span>")
+				update_icon()
+				return
+	..()
+	return
+
+
+/obj/machinery/power/converter/wrenchable()
+	if(mDC_node || terminal) //Must not be wired
+		return 0
+	else
+		return ..()
+
+
+//-- Icon Overrides --
+/obj/machinery/power/converter/examine(mob/user)
+	..()
+	if (mDC_node)
+		to_chat(user, "<span class='notice'>The [src] is wired up and fixed in place.</span>")
+	else if(state && (available_modes_flags & DCINPUT || available_modes_flags & DCOUTPUT))
+		to_chat(user, "<span class='notice'>The [src] is anchored to the ground, but could use some wiring.</span>")
+
+/obj/machinery/power/converter/update_icon()
+	underlays.len = 0
+	if(mDC_node)
+		for (var/i in mDC_node.connected_dirs)
+			world.log << "[i], [DC_wire_underlays[i]]"
+			underlays += DC_wire_underlays[i]
+
+	if(panel_open)
+		if (stat & BROKEN)
+			icon_state = icon_state_openb
+		else
+			icon_state = icon_state_open
+	else if (stat & BROKEN)
+		icon_state = icon_state_broken
+	else if (active)
+		icon_state = icon_state_on
+	else
+		icon_state = icon_state_off
+
+//-- UI --
+/obj/machinery/power/converter/proc/get_ui_data()
+	var/data[0]
+	return data
+
+
+//-- UI Overrides --
+
+/obj/machinery/power/converter/attack_ai(mob/user)
+	src.add_hiddenprint(user)
+	add_fingerprint(user)
+	ui_interact(user)
+
+
+/obj/machinery/power/converter/attack_hand(mob/user)
+	add_fingerprint(user)
+	ui_interact(user)
+
+
+/obj/machinery/power/converter/ui_interact(mob/user, ui_key = "main", var/datum/nanoui/ui = null, var/force_open=NANOUI_FOCUS)
+
+	if(stat & BROKEN)
 		return
 
-	return ..()
+	// This is the data which will be sent to the ui
+	var/list/data = get_ui_data()
+
+	// Update the ui if it exists, returns null if no ui is passed/found
+	ui = nanomanager.try_update_ui(user, src, ui_key, ui, data, force_open)
+	if (!ui)
+		// The ui does not exist, so we'll create a new() one
+        // For a list of parameters and their descriptions see the code docs in \code\modules\nano\nanoui.dm
+		ui = new(user, src, ui_key, ui_tmpl, ui_name, 540, 380)
+		// When the ui is first opened this is the data it will use
+		ui.set_initial_data(data)
+		// Open the new ui window
+		ui.open()
+		// Auto update every Master Controller tick
+		ui.set_auto_update(1)
 
 
-/obj/machinery/power/capacitor_bank/nnui/converter/rotary/can_attach_terminal(mob/user)
-	return ..(user) && panel_open
+/obj/machinery/power/converter/Topic(href, href_list)
+	if(..())
+		return 1
+	if(href_list["close"])
+		if(usr.machine == src)
+			usr.unset_machine()
+		return 1
+	if (!isAdminGhost(usr) && (usr.stat || usr.restrained()))
+		return
+	if (!(istype(usr, /mob/living/carbon/human) || ticker) && ticker.mode.name != "monkey")
+		if(!istype(usr, /mob/living/silicon/ai) && !isAdminGhost(usr))
+			to_chat(usr, "<span class='warning'>You don't have the dexterity to do this!</span>")
+			return
+	if (!isturf(src.loc) && !istype(usr, /mob/living/silicon/) && !isAdminGhost(usr))
+		return 0 // Do not update ui
 
 
-
+///////////////////////////////////////////////////////////////////////
+//ROTARY CONVERTER
 /*
-/obj/machinery/power/capacitor_bank/terminal/rectifier
-	name = "mercury arc rectifier"
-	desc = "Turns AC power into DC power"
-
-	icon_state = "inverter"
-	icon_state_open = "inverter_open"
-	icon_state_broken = "inverter_broken"
-	icon_state_openb = "inverter_openb"
-	icon_state_off = "inverter"
-	icon_state_on = "inverter_on"
-	icon_state_active = "inverter_active"
-
-	//Machine stuff
-	component_parts = newlist(
-		/obj/item/weapon/circuitboard/capacitor_bank/mainframe,
-		/obj/item/weapon/stock_parts/capacitor,
-		/obj/item/weapon/stock_parts/capacitor,
-		/obj/item/weapon/stock_parts/console_screen,
-		/obj/item/weapon/reagent_containers/glass/beaker,
-		/obj/item/weapon/reagent_containers/glass/beaker,
-		/obj/item/weapon/reagent_containers/glass/beaker
-	)
-
-/////////////////////////////////////////////
-// POWER INVERTER
-/*
- *	A DC motor and AC generator, gets power off the capacitors and into the power grid.
- *	Higher output requires higher torque, at less efficiency.
- *	Torque and friction will cause stress, breaking the inverter. This places a lmit on torque, and thus output.
- *	Lowering torque will have the machine recover from most of it's stress, but some will stay. Repair may be needed eventually.
- *	Lube can be added to the machine, reducing friction and raising the limit on torque.
+ * Two piece converter, consisting of a Motor and a Generator.
  *
- *	Doing some research, actual inverters are actually electronics based, but didn't find out until long after I had the sprites
- *	and general idea worked, so fuck it.
  */
 
+//// GENERATOR ////
+/obj/machinery/power/converter/rotaryG
+	//Icons
+	name = "Universal Generator"
+	desc = "Can produce either AC or DC"
 
-/obj/machinery/power/capacitor_bank/terminal/inverter
-	name = "power inverter"
-	desc = "Transforms DC power into AC power. You're pretty sure it's actually an M-G set."
+	icon = 'icons/obj/machines/dc_network.dmi'
+	icon_state = "rotaryG"
+	icon_state_open = "rotaryG_open"
+	icon_state_broken = "rotaryG_broken"
+	icon_state_openb = "rotaryG_openb"
+	icon_state_off = "rotaryG"
+	icon_state_on = "rotaryG_active"
 
-	icon_state = "inverter"
-	icon_state_open = "inverter_open"
-	icon_state_broken = "inverter_broken"
-	icon_state_openb = "inverter_openb"
-	icon_state_off = "inverter"
-	icon_state_on = "inverter_on"
-	icon_state_active = "inverter_active"
+	//Machine
+	//TODO: Components and circuit board
+	//component_parts = newlist()
 
-	var/output = 0 // How much power we aim to generate
-	var/input = 0 // How much power we're drawing to generate the ouput
-	var/torque = 0 // Torque required to generate the given output at the given rpm
+	//Converter
+	available_modes_flags = DCOUTPUT | ACOUTPUT
 
-	var/max_torque = 0 // How much torque the machine can take before taking stress
-	var/base_max_torque = 0 // max_torque before taking friction into account. This is how strong we could get if perfectly lubed
+	//Generator stuff
+	var/obj/machinery/power/converter/rotaryG/motor = null
 
-	var/efficiency = 0 //Rises with lube.
+//-- DC network --
 
-	var/stress = 0 // Stress suffered due to excessive torque
-	var/fatigue = 0 // Stress accumulated after current stress subsides
+/obj/machinery/power/converter/rotaryG/DC_available_dirs()
+	return (cardinal - dir)
 
-	var/const/frequency = 50 // Determines torque required for the output
-	var/const/max_torque_per_manipulator = 100e6 / frequency // Better manipulators increase the base_max_torque. Balanced for maxing at 100MW each
-	var/const/base_efficiency = 0.5 //Efficiency before taking lube into account
-	var/const/max_stress = 100
 
-	//Machine stuff
-	component_parts = newlist(
-		/obj/item/weapon/circuitboard/capacitor_bank/mainframe,
-		/obj/item/weapon/stock_parts/manipulator,
-		/obj/item/weapon/stock_parts/manipulator,
-		/obj/item/weapon/stock_parts/capacitor,
-		/obj/item/weapon/stock_parts/capacitor,
-		/obj/item/weapon/stock_parts/console_screen,
-		/obj/item/weapon/reagent_containers/glass/beaker
-	)
+/obj/machinery/power/converter/rotaryG/process()
+	set waitfor = FALSE
+	return PROCESS_KILL
 
-/obj/machinery/power/capacitor_bank/terminal/update()
-	max_torque = base_max_torque * efficiency
-	torque = output / frequency
-	input = output / efficiency
+/obj/machinery/power/converter/rotaryG/ui_interact(mob/user, ui_key = "main", var/datum/nanoui/ui = null, var/force_open=NANOUI_FOCUS)
+	if(motor)
+		motor.ui_interact(user, ui_key, ui, force_open)
 
-/obj/machinery/power/capacitor_bank/terminal/power_interact()
-	if (reagents)
-		reagents = max(0, reagents - 1)
-		efficiency = base_efficiency + reagents ? 0.45 : 0
+//// MOTOR ////
+/obj/machinery/power/converter/rotaryM
+	//Icons
+	name = "Universal Motor"
+	desc = "Can use either AC or DC to drive it's shaft"
 
-	if(torque > max_torque)
-		stress += (torque - max_torque) / max_torque
-	else if(stress > 0)
-		stress = max(0, stress - 2.5)
-		fatigue += 0.5
+	icon = 'icons/obj/machines/dc_network.dmi'
+	icon_state = "rotaryM"
+	icon_state_open = "rotaryM_open"
+	icon_state_broken = "rotaryM_broken"
+	icon_state_openb = "rotaryM_openb"
+	icon_state_off = "rotaryM"
+	icon_state_on = "rotaryM_active"
 
-	if(stress + fatigue > max_stress)
-		disconnect()
-		explode(TNTENERGY) //Just enough for a (1,0,0) dev explosion
+	//UI
+	ui_tmpl = "rotary_converter.tmpl" //The .tmpl file used for the UI
+	ui_name = "The Rotary Converter" // The name that'll appear on the UI
+
+	//Machine
+	//TODO: Components and circuit board
+	//component_parts = newlist()
+
+	//Converter
+	available_modes_flags = DCINPUT | ACINPUT
+
+	//Rotary stuff
+	var/obj/machinery/power/converter/rotaryG/generator = null
+
+	var/const/frequency = 50             // I'm choosing a 50Hz frequency so that the torque figures look nicer
+	var/torque = 0                       // Torque required by the input on the generator, measured in Nm
+	var/const/torque_max_diff = 14000000 // Due to efficiency, there's a differenece in torque between the Motor and generator. The shaft can only take so much
+	                                     //  excess torque before it suffers from it, causing stress
+	                                     //  This effectively limits the maximum output. TODO: I've pulled these figures out my ass, balance later
+
+	var/stress = 0            // Current stress suffered from the difference in motor and generator torques, as a percent
+	var/stress_cumulative = 0 // Accumulated stress from previous stressful episodes, as a percent
+	var/stress_total = 0      // stress + stress_cumulative. If this reaches 100% the rotary will break
+
+	var/base_efficiency = 0.75 // Efficiency before applying lube or whatever magic thing I end up using. TODO: Research. Skowron told me about generators using carbon dust, but seems like dust's actually bad and causes flash-overs
+	var/min_efficiency = 0.50  // Higher torque -> Lower efficiency
+	var/max_efficiency = 0.95  // Higher lube rate -> Higher efficiency
+
+	var/lube_rate = 0         // How much lube we consume every tick
+	var/carbon_dust = 0       // Carbon dust percent. Higher than 80% and you'll have a (carbon% - 80)% probability of
+	                          //  flash-overs, which cause input spikes. Clean it out with ethanol TODO: research how cleaning works irl
+	var/const/carbon_per_torque = 0.01 / torque_max_diff // Carbon produced per torque Nm. Carbon comes from the carbon brushes on the generator wearing down. TODO: Balance
+
+	var/flashover = 0
+	var/flashover_start = 0
+	var/const/flashover_peak = 20
+
+
+//-- DC network --
+
+/obj/machinery/power/converter/rotaryM/DC_available_dirs()
+	return (cardinal - dir)
+
+
+//--Power Transfer Overrides
+/obj/machinery/power/converter/rotaryM/toggle_active()
+	if(generator)
+		active = !active
+		generator.active = active
+		update_icon()
+		generator.update_icon()
+		if(active)
+			//TODO: Replace this with a sound of it's own I guess
+			playsound(src, 'sound/mecha/powerup.ogg', 50, 1)
+
+
+//Checks wether we can proceed with the power_transfer()
+/obj/machinery/power/converter/rotaryM/working_output()
+	return generator.working_output()
+
+
+/obj/machinery/power/converter/rotaryM/do_DC_output(var/output)
+	return generator.do_DC_output(output)
+
+
+/obj/machinery/power/converter/rotaryM/do_AC_output(var/output)
+	return generator.do_AC_output(output)
+
+
+//-- Damage --
+
+/obj/machinery/power/converter/rotaryM/proc/flashover()
+	if(!input || !(target_input || flashover_start)) //No input? Stop any flash-over and return
+		if(flashover_start)
+			target_input = flashover_start
+			flashover_start = 0
 		return
 
-	// Output
-	if (get_powernet())
-		var/out = Clamp(cap_network.charge * friction, 0, output)
-		cap_network.charge -= out / friction
-		add_avail(out) // Add output to powernet
+	if(!flashover_start) //Start a flash-over
+		playsound(src, 'sound/effects/engine_alert2.ogg', 50, 1) //UH OH!
+		flashover_start = target_input
 
-		if (cap_network.charge < 0.0001)
-			use_power = 1
+	if(prob(max(100 * (flashover / (flashover_start * flashover_peak)) - 20, 0)))
+		//The worse the flash-over gets, the higher the chance it might finally stop
+		flashover -= flashover/rand(1,10)
+		playsound(src, 'sound/effects/eleczap.ogg', 50, 1, 1)
+	else
+		//Otherwise, steadily worsen
+		if(prob(25))
+			spark(generator)
+		flashover = min(flashover * 1.1, (flashover_start * flashover_peak))
 
-/obj/machinery/power/capacitor_bank/RefreshParts()
-	actual_capacity = 0
-	base_max_torque = 0
-	for(var/obj/item/weapon/stock_parts/SP in component_parts)
-		if(istype(SP, /obj/item/weapon/stock_parts/capacitor))
-			actual_capacity += C.maximum_charge
-		if(istype(SP, /obj/item/weapon/stock_parts/manipulator))
-			base_max_torque += SP.rating * max_torque_per_manipulator
+	if(flashover)//Increase input, and with it torque difference, stress, and capacitor charge on the output if applicable.
+	             // Something's bound to explode at some point
+		target_input = flashover
+	else
+		//Flash-over dies down? Return to normal
+		target_input = flashover_start
+		flashover_start = 0
 
+/obj/machinery/power/converter/rotaryM/proc/explode()
 
+	var/loops = rand(0,5)
+	for(var/i = 0; i < loops; i++)
+		playsound(src, 'sound/effects/bang.ogg', 50, 1, 1) //GET AWAY
+		sleep(rand(0,2))
 
+	sleep(rand(2,5))
+	if(input > 5e6)
+		playsound(src, 'sound/effects/immovablerod_clong.ogg', 100, 1)
 
-///////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////
-/obj/machinery/power/capacitor_bank/adapter
-	name = "adapter"
-	desc = "Passes DC power to and from complex, power-hungry machinery."
+	else
+		playsound(src, 'sound/effects/clang.ogg', 100, 1, 1)
 
-	icon_state = "inverter"
-	icon_state_open = "inverter_open"
-	icon_state_broken = "inverter_broken"
-	icon_state_openb = "inverter_openb"
-	icon_state_off = "inverter"
-	icon_state_on = "inverter_on"
-	icon_state_active = "inverter_on"
-	var/icon_state_in = "inverter_in"
-	var/icon_state_out = "inverter_out"
+	stat |= BROKEN
+	update_icon()
 
-	var//obj/machinery/power/capacitor_bank/adapter/consumer = null //Whoever we're giving energy to or taking from
+/obj/machinery/power/converter/rotaryM/DC_damage(var/charge)
+	if(!flashover)
+		flashover = target_input * flashover_peak / 3
+		flashover()
+		var/datum/DC_network/net = get_DCnet()
+		net.add_charge(-flashover)
 
-	var/const/IDLE = 0
-	var/const/GIVE   = 1
-	var/const/TAKE = 2
-	var/charge_flow = 0 //Wether we're taking or giving energy
+//-- Process --
 
-	//Machine stuff
-	component_parts = newlist(
-		/obj/item/weapon/circuitboard/capacitor_bank/mainframe,
-		/obj/item/weapon/stock_parts/capacitor,
-		/obj/item/weapon/stock_parts/capacitor,
-		/obj/item/weapon/stock_parts/capacitor,
-		/obj/item/weapon/stock_parts/capacitor
-	)
+/obj/machinery/power/converter/rotaryM/process()
+	if(!generator)
+		return
+	..()
+	if(flashover || (active && prob(max(100 * carbon_dust - 80, 0))))//Start (or continue) a flashover
+		flashover()
 
-/obj/machinery/power/capacitor_bank/adapter/update_icon()
+	if(active && prob((100 * (stress + stress_cumulative) ? 10 : 0)))
+		explode(input)
 
-*/
-*/
+//--UI Overrides
+
+/obj/machinery/power/converter/rotaryM/get_ui_data()
+	var/data[0]
+	data["input"] = input
+	data["output"] = output
+	data["efficiency"] = efficiency
+	data["active"] = active
+	data["tinput"] = torque
+	data["toutput"] = torque
+	data["tdiff"] = torque
+	data["maxtdiff"] = torque_max_diff
+	data["stress"] = round(min(stress + stress_cumulative, 1) * 100)
+	data["carbon"] = round(carbon_dust * 100)
+	data["reagents"] = list()
+	data["lubeRate"] = 0
+	data["lubeMinutes"] = 0
+	return data

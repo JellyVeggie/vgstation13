@@ -37,17 +37,17 @@ var/global/list/DC_mainframe_charge_meter = list(
 //-- UI --
 /obj/machinery/capacitor_bank/mainframe/proc/get_ui_data()
 	var/data[0]
-	if(mDC_node)
-		if(mDC_node.network)
-			data["hasNetwork"] = 1
-			data["charge"] = mDC_node.network.charge
-			data["chargeLevel"] = round(charge_level() * 100,0.1)
-			data["capacity"] = mDC_node.network.capacity
-			data["safeCapacity"] = mDC_node.network.safe_capacity
-			data["safeCapacityBonus"] = mDC_node.network.safe_capacity - mDC_node.network.capacity * mDC_node.network.base_safety_limit
-			data["nodes"] = mDC_node.network.nodes.len
-			data["mainframes"] = mDC_node.network.mainframes
-			data["mainframesWanted"] = -round(mDC_node.network.nodes.len / -10) //Ceiling(mDC_node.network.nodes.len / 10). THis should be replaced with an actual Ceiling() some day
+	var/datum/DC_network/net = get_DCnet()
+	if(net)
+		data["hasNetwork"] = 1
+		data["charge"] = net.charge
+		data["chargeLevel"] = round(charge_level() * 100,0.1)
+		data["capacity"] = net.capacity
+		data["safeCapacity"] = net.safe_capacity
+		data["safeCapacityBonus"] = net.safe_capacity - net.capacity * net.base_safety_limit
+		data["nodes"] = net.nodes.len
+		data["mainframes"] = net.mainframes
+		data["mainframesWanted"] = -round(net.nodes.len / -10) //Ceiling(mDC_node.network.nodes.len / 10). THis should be replaced with an actual Ceiling() some day
 	else
 		data["hasNetwork"] = 0
 		data["charge"] = 0
@@ -117,9 +117,9 @@ var/global/list/DC_mainframe_charge_meter = list(
 //-- Network --
 
 /obj/machinery/capacitor_bank/mainframe/proc/charge_level()
-	if(mDC_node)
-		if(mDC_node.network)
-			return max(mDC_node.network.charge/(mDC_node.network.safe_capacity ? mDC_node.network.safe_capacity : 0.01), 0)
+	var/datum/DC_network/net = get_DCnet()
+	if(net)
+		return max(net.charge/(net.safe_capacity ? net.safe_capacity : 0.01), 0)
 	return 0
 
 
@@ -147,9 +147,9 @@ var/global/list/DC_mainframe_charge_meter = list(
 
 /obj/machinery/capacitor_bank/mainframe/examine(mob/user)
 	..()
-	if(mDC_node)
-		if(mDC_node.network)
-			to_chat(user, "<span class='notice'>The charge meter reads: [round(charge_level() * 100,0.1)]% ([mDC_node.network.charge] J).</span>")
+	var/datum/DC_network/net = get_DCnet()
+	if(net)
+		to_chat(user, "<span class='notice'>The charge meter reads: [round(charge_level() * 100,0.1)]% ([net.charge] J).</span>")
 
 
 //-- Machine Overrides

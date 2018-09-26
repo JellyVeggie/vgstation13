@@ -26,11 +26,9 @@ var/global/list/DC_wire_underlays = list(1 = image('icons/obj/machines/dc_networ
 	// For DC machinery this should usually be "cardinal", though "cardinal - dir" is a common option too
 	return list() //Can't connect, by default. You'll have to overwrite this
 
-
 // Wether this machine helps make DC networks it's connected to safely hold more charge
 /obj/machinery/proc/DC_is_mainframe()
 	return 0
-
 
 // How excess power on the DC network this machine is connected to affects the machine
 /obj/machinery/proc/DC_damage(var/energy)
@@ -42,6 +40,12 @@ var/global/list/DC_wire_underlays = list(1 = image('icons/obj/machines/dc_networ
 	 *  however much capacity it should lose
 	 */
 	return
+
+
+/obj/machinery/proc/get_DCnet(var/energy)
+	if (mDC_node)
+		return mDC_node.network
+	return null
 
 // Most DC machinery should have a wiring underlay showing what they are connected to. Should your machine have to show a wiring underlay, you
 // can implement that like on this example. Replace DC_wire_underlays with whatever list of wires you need

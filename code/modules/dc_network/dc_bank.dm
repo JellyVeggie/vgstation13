@@ -2,7 +2,7 @@
 #define TNTENERGY 4.18e6 //1 Kg TNT = 4.18 MJ,
 
 /////////////////////////////////////////////
-// Capacitor bank OR VRLA batteries
+// Capacitor banks
 /*
  * A modular SMES system for engineers to play with
  * Machines inheriting from here can be connected together into a single network. For fluff and theme, this got named the capacitor network, storing power as DC
@@ -22,6 +22,8 @@
  *     compress plasma and get something insane. Can you imagine plasma that is infinitely dense?" --jknpjr on the ivory tower discord
  *  - Plasma Supercooler: "I dont have an issue with 0k plasma, I just think we should have a machine that pushes to it, instead of something lazy like foam.
  *     Wheres that super emitter guy, this is where you could shine." --Anonymous No.228877687 on /vg/ss13g
+ *
+ * TODO: Re-theme as VRLA Battery banks instead
  */
 /obj/machinery/capacitor_bank
 	name = "capacitor bank"
@@ -71,7 +73,6 @@
 //-- Interaction Overrides --
 
 /obj/machinery/capacitor_bank/attackby(var/obj/O, var/mob/user)
-	..()
 	if (istype(O, /obj/item/stack/cable_coil) && !mDC_node && state)
 		var/obj/item/stack/cable_coil/CC = O
 		if (CC.amount < 1)
@@ -85,6 +86,7 @@
 		CC.use(1)
 		to_chat(user, "<span class='notice'>You wire \the [src].</span>")
 		update_icon()
+		return
 
 	if (istype(O, /obj/item/weapon/wirecutters) && mDC_node)
 		if(do_after(user, src, 30))
@@ -94,6 +96,8 @@
 			getFromPool(/obj/item/stack/cable_coil, get_turf(src), 1)
 			to_chat(user, "<span class='notice'>You cut \the [src]'s wires.</span>")
 			update_icon()
+		return
+	..()
 
 /obj/machinery/capacitor_bank/wrenchable()
 	if(mDC_node) //Must not be wired
