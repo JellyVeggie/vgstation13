@@ -119,6 +119,7 @@
 //-- Damage --
 //TODO: Damage
 /obj/machinery/capacitor_bank/DC_damage(energy)
+	update_overlay()
 	return
 
 
@@ -156,6 +157,14 @@
 	..()
 
 
+//-- Icon --
+/obj/machinery/capacitor_bank/proc/update_overlay()
+	overlays.len = 0
+	if (mDC_node)
+		if(mDC_node.capacity_loss > 1)
+			overlays += image('icons/obj/machines/dc_network.dmi', "capacitor_bank-ow")
+
+
 //-- Icon overides --
 
 /obj/machinery/capacitor_bank/examine(mob/user)
@@ -167,9 +176,9 @@
 
 /obj/machinery/capacitor_bank/update_icon()
 	underlays.len = 0
+	update_overlay()
 	if(mDC_node)
 		for (var/i in mDC_node.connected_dirs)
-			world.log << "[i], [DC_wire_underlays[i]]"
 			underlays += DC_wire_underlays[i]
 
 	if(panel_open)

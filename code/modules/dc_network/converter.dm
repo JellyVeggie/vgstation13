@@ -61,7 +61,7 @@
 
 //Checks wether we can proceed with the power_transfer()
 /obj/machinery/power/converter/proc/working_output()
-	return DC_input && get_DCnet() || !DC_input && get_powernet()
+	return DC_output && get_DCnet() || !DC_output && get_powernet()
 
 
 /obj/machinery/power/converter/proc/set_output(var/output)
@@ -181,7 +181,7 @@
 			to_chat(user, "<span class='warning'>You must first cut the terminal from the [src]!</span>")
 			return 1
 
-		if(istype(W, /obj/item/stack/cable_coil) && !terminal)
+		if(istype(W, /obj/item/stack/cable_coil) && !terminal && state)
 			var/obj/item/stack/cable_coil/CC = W
 
 			if (CC.amount < 10)
@@ -262,7 +262,6 @@
 	underlays.len = 0
 	if(mDC_node)
 		for (var/i in mDC_node.connected_dirs)
-			world.log << "[i], [DC_wire_underlays[i]]"
 			underlays += DC_wire_underlays[i]
 
 	if(panel_open)
@@ -337,19 +336,21 @@
 
 ///////////////////////////////////////////////////////////////////////
 //ROTARY CONVERTER
+///////////////////////////////////////////////////////////////////////
 /*
  * Two piece converter, consisting of a Motor and a Generator.
  *
  */
 
-//// GENERATOR ////
+///////////////////////////////////////////////////////////////////////
+// GENERATOR
 /obj/machinery/power/converter/rotaryG
 	//Icons
 	name = "Universal Generator"
 	desc = "Can produce either AC or DC"
 
 	icon = 'icons/obj/machines/dc_network.dmi'
-	icon_state = "rotaryG"
+	icon_state = "rotaryG_shaftless"
 	icon_state_open = "rotaryG_open"
 	icon_state_broken = "rotaryG_broken"
 	icon_state_openb = "rotaryG_openb"
@@ -364,7 +365,19 @@
 	available_modes_flags = DCOUTPUT | ACOUTPUT
 
 	//Generator stuff
-	var/obj/machinery/power/converter/rotaryG/motor = null
+	var/obj/machinery/power/converter/rotaryM/motor = null
+
+//-- Connect machines --
+
+/obj/machinery/power/converter/rotaryG/proc/connect_to_M()
+	var/turf/T = get_step(src, dir)
+	if(!T)
+		return
+	motor = null
+	for(var/list/obj/machinery/power/converter/rotaryM/mot in T.contents) //TODO: There's probably a better way to do this
+		motor = mot
+	if(motor)
+		motor.generator = src
 
 //-- DC network --
 
@@ -380,14 +393,50 @@
 	if(motor)
 		motor.ui_interact(user, ui_key, ui, force_open)
 
-//// MOTOR ////
+
+//-- Icon --
+/obj/machinery/power/converter/rotaryG/update_icon()
+	..()
+	if(!motor)
+		icon_state = "rotaryG_shaftless"
+
+	overlays.len = 0
+	if(motor)
+		if(motor.flashover)
+			overlays += image('icons/effects/effects.dmi', "electricity")
+
+
+//-- Damage --
+/obj/machinery/power/converter/rotaryG/proc/zap()
+	var/turf/T = get_turf(src)
+	var/turf/U = pick(circlerange(src, 3) - circlerange(src, 1) )
+	if (!T || !U)
+		return
+
+	var/fire_sound = pick(lightning_sound)
+	var/obj/item/projectile/A = new /obj/item/projectile/beam/lightning()
+
+	A.original = U
+	A.target = U
+	A.current = T
+	A.starting = T
+	A.yo = U.y - T.y
+	A.xo = U.x - T.x
+	playsound(T, fire_sound, 50, 1)
+	A.OnFired()
+	A.process()
+
+	return
+
+///////////////////////////////////////////////////////////////////////
+// MOTOR
 /obj/machinery/power/converter/rotaryM
 	//Icons
 	name = "Universal Motor"
 	desc = "Can use either AC or DC to drive it's shaft"
 
 	icon = 'icons/obj/machines/dc_network.dmi'
-	icon_state = "rotaryM"
+	icon_state = "rotaryM_shaftless"
 	icon_state_open = "rotaryM_open"
 	icon_state_broken = "rotaryM_broken"
 	icon_state_openb = "rotaryM_openb"
@@ -409,27 +458,35 @@
 	var/obj/machinery/power/converter/rotaryG/generator = null
 
 	var/const/frequency = 50             // I'm choosing a 50Hz frequency so that the torque figures look nicer
-	var/torque = 0                       // Torque required by the input on the generator, measured in Nm
+	var/torque_input = 0                 // Torque produced by the input on the motor to match the frequency, measured in Nm
+	var/torque_output = 0                // Torque required by the output on the generator to match the frequency, measured in Nm
 	var/const/torque_max_diff = 14000000 // Due to efficiency, there's a differenece in torque between the Motor and generator. The shaft can only take so much
 	                                     //  excess torque before it suffers from it, causing stress
 	                                     //  This effectively limits the maximum output. TODO: I've pulled these figures out my ass, balance later
 
 	var/stress = 0            // Current stress suffered from the difference in motor and generator torques, as a percent
 	var/stress_cumulative = 0 // Accumulated stress from previous stressful episodes, as a percent
-	var/stress_total = 0      // stress + stress_cumulative. If this reaches 100% the rotary will break
 
+	efficiency = 0.95
 	var/base_efficiency = 0.75 // Efficiency before applying lube or whatever magic thing I end up using. TODO: Research. Skowron told me about generators using carbon dust, but seems like dust's actually bad and causes flash-overs
 	var/min_efficiency = 0.50  // Higher torque -> Lower efficiency
 	var/max_efficiency = 0.95  // Higher lube rate -> Higher efficiency
 
 	var/lube_rate = 0         // How much lube we consume every tick
-	var/carbon_dust = 0       // Carbon dust percent. Higher than 80% and you'll have a (carbon% - 80)% probability of
-	                          //  flash-overs, which cause input spikes. Clean it out with ethanol TODO: research how cleaning works irl
-	var/const/carbon_per_torque = 0.01 / torque_max_diff // Carbon produced per torque Nm. Carbon comes from the carbon brushes on the generator wearing down. TODO: Balance
+	var/carbon_dust = 0         // Carbon dust percent. Clean it out with ethanol TODO: research how cleaning works irl
+	var/carbon_dust_limit = 0.8 // Past this point you'll have a (carbon - limit)% probability of flash-overs.
+	var/const/carbon_per_torque = 0.001 / torque_max_diff // Carbon produced per torque Nm by wearing down thebrushes. TODO: Balance. 1000 process() at max torque diff for now
 
-	var/flashover = 0
-	var/flashover_start = 0
-	var/const/flashover_peak = 20
+	var/flashover = 0             // How severe the flash-over currently is. Replaces target_input during the flash-over
+	var/flashover_start = 0       // How severe the flash-over was when it started. Stores the original target_input
+	var/const/flashover_peak = 20 // How bad the flash-over can get, aka flashover_start * flashover_peak.
+	                              //  From a 1926 article: http://nzetc.victoria.ac.nz/tm/scholarly/tei-Gov01_05Rail-t1-body-d23.html
+	                              //  "...it may be stated that a flash-over [...] will be in the region of 20 times the output of the generator"
+	                              //  It's an interesting read, so give it a go.
+
+	reagents = new /datum/reagents(100) //TODO: Yet another thing to balance
+
+
 
 
 //-- DC network --
@@ -450,9 +507,10 @@
 			playsound(src, 'sound/mecha/powerup.ogg', 50, 1)
 
 
-//Checks wether we can proceed with the power_transfer()
 /obj/machinery/power/converter/rotaryM/working_output()
-	return generator.working_output()
+	if(generator)
+		return DC_output && generator.get_DCnet() || !DC_output && generator.get_powernet()
+	return 0
 
 
 /obj/machinery/power/converter/rotaryM/do_DC_output(var/output)
@@ -461,7 +519,6 @@
 
 /obj/machinery/power/converter/rotaryM/do_AC_output(var/output)
 	return generator.do_AC_output(output)
-
 
 //-- Damage --
 
@@ -474,17 +531,26 @@
 
 	if(!flashover_start) //Start a flash-over
 		playsound(src, 'sound/effects/engine_alert2.ogg', 50, 1) //UH OH!
+		generator.update_icon()
 		flashover_start = target_input
+		flashover = flashover_start
 
 	if(prob(max(100 * (flashover / (flashover_start * flashover_peak)) - 20, 0)))
 		//The worse the flash-over gets, the higher the chance it might finally stop
 		flashover -= flashover/rand(1,10)
-		playsound(src, 'sound/effects/eleczap.ogg', 50, 1, 1)
+		if(prob(75))
+			playsound(src, 'sound/effects/eleczap.ogg', 50, 1, 1)
+		else
+			generator.zap()
 	else
 		//Otherwise, steadily worsen
-		if(prob(25))
-			spark(generator)
-		flashover = min(flashover * 1.1, (flashover_start * flashover_peak))
+		if(prob(50))
+			if(prob(50))
+				spark(generator)
+			else
+				playsound(src, 'sound/effects/electricity_short_disruption.ogg', 50, 1, 1)
+
+		flashover = min(flashover * 1.2, (flashover_start * flashover_peak))
 
 	if(flashover)//Increase input, and with it torque difference, stress, and capacitor charge on the output if applicable.
 	             // Something's bound to explode at some point
@@ -493,23 +559,28 @@
 		//Flash-over dies down? Return to normal
 		target_input = flashover_start
 		flashover_start = 0
+		generator.update_icon()
 
 /obj/machinery/power/converter/rotaryM/proc/explode()
-
 	var/loops = rand(0,5)
 	for(var/i = 0; i < loops; i++)
 		playsound(src, 'sound/effects/bang.ogg', 50, 1, 1) //GET AWAY
 		sleep(rand(0,2))
 
 	sleep(rand(2,5))
-	if(input > 5e6)
+	//TODO: Balance, I guess
+	if(input > 100000)
 		playsound(src, 'sound/effects/immovablerod_clong.ogg', 100, 1)
 
 	else
-		playsound(src, 'sound/effects/clang.ogg', 100, 1, 1)
+		playsound(src, 'sound/effects/bang.ogg', 100, 1, 1)
 
 	stat |= BROKEN
+	generator.stat |= BROKEN
+	active = 0
+	generator.active = 0
 	update_icon()
+	generator.update_icon()
 
 /obj/machinery/power/converter/rotaryM/DC_damage(var/charge)
 	if(!flashover)
@@ -520,31 +591,96 @@
 
 //-- Process --
 
-/obj/machinery/power/converter/rotaryM/process()
-	if(!generator)
-		return
-	..()
-	if(flashover || (active && prob(max(100 * carbon_dust - 80, 0))))//Start (or continue) a flashover
-		flashover()
 
-	if(active && prob((100 * (stress + stress_cumulative) ? 10 : 0)))
-		explode(input)
+/obj/machinery/power/converter/rotaryM/proc/connect_to_G()
+	var/turf/T = get_step(src, dir)
+	if(!T)
+		return
+	generator = null
+	for(var/list/obj/machinery/power/converter/rotaryG/gen in T.contents) //TODO: There's probably a better way to do this
+		generator = gen
+	if(generator)
+		generator.motor = src
+
+
+/obj/machinery/power/converter/rotaryM/proc/disconnect_from_G()
+	generator.motor = null
+	generator.update_icon()
+	generator = null
+	update_icon()
+
+
+/obj/machinery/power/converter/rotaryM/process()
+	if(state)
+		..()
+		if(flashover || (active && prob(max(100 * carbon_dust - 80, 0))))//Start (or continue) a flashover
+			flashover()
+
+		//Get torque. TODO: effects of lube
+		torque_input = input / frequency
+		torque_output = output / frequency
+		carbon_dust += carbon_per_torque * torque_output
+
+		if(torque_input - torque_output > torque_max_diff)//Get stressed
+			stress += 1 //balance
+		else if(stress > 0)
+			stress = max(stress - 0.5, 0)
+			stress_cumulative += 0.05
+
+		if(active && prob((100 * (stress + stress_cumulative) > 50 ? 10 : 0)))//Break if there's too much stress
+			explode(input)
+
+
+//-- Icon Overrides --
+
+/obj/machinery/power/converter/rotaryM/update_icon()
+	..()
+	if(!generator)
+		icon_state = "rotaryM_shaftless"
 
 //--UI Overrides
 
 /obj/machinery/power/converter/rotaryM/get_ui_data()
 	var/data[0]
+
+	data["active"] = active
+	data["can_activate"] = working_input() && working_output()
+
+	data["input_modes_available"] = list(terminal ? terminal.get_powernet() != null : 0, get_DCnet() != null)
+	data["input_mode"] = DC_input
+	data["output_modes_available"] = generator ? list(generator.get_powernet() != null, generator.get_DCnet()!= null) : list(0, 0)
+	data["output_mode"] = DC_output
+
 	data["input"] = input
 	data["output"] = output
-	data["efficiency"] = efficiency
-	data["active"] = active
-	data["tinput"] = torque
-	data["toutput"] = torque
-	data["tdiff"] = torque
-	data["maxtdiff"] = torque_max_diff
-	data["stress"] = round(min(stress + stress_cumulative, 1) * 100)
-	data["carbon"] = round(carbon_dust * 100)
-	data["reagents"] = list()
-	data["lubeRate"] = 0
-	data["lubeMinutes"] = 0
+	data["target_input"] = flashover ? flashover_start : target_input
+	data["target_output"] = target_output
+
+	data["efficiency"] = efficiency * 100
+
+	data["torque_input"] = torque_input
+	data["target_torque_input"] = target_input / frequency
+
+	data["torque_output"] = torque_output
+	data["target_torque_output"] = target_output / frequency
+
+
+	data["target_torque_diff"] = (target_input - target_output / frequency)
+	data["torque_diff"] = torque_input - torque_output
+	data["torque_maxdiff"] = torque_max_diff
+
+
+	data["stress"] = stress + stress_cumulative
+
+	data["carbon"] = carbon_dust * 100
+
+	var/list/r_list
+	for (var/datum/reagent/R in reagents.reagent_list)
+		r_list["[R.name]"] = R.volume
+	data["reagents"] = list("total_volume" = reagents.total_volume, "maximum_volume" = reagents.maximum_volume, "reagent_list" = r_list)
+	data["reagentRate"] = 0
+
 	return data
+
+/obj/machinery/power/converter/Topic(href, href_list)
+	..()

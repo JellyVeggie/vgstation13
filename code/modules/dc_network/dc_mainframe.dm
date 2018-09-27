@@ -129,20 +129,13 @@ var/global/list/DC_mainframe_charge_meter = list(
 
 
 //-- Icon OVerrides --
-/obj/machinery/capacitor_bank/mainframe/proc/update_overlay()
+/obj/machinery/capacitor_bank/mainframe/update_overlay()
+	..()
+
 	var/clevel = min(-round(-4 * charge_level()), DC_mainframe_charge_meter.len)
-	overlays.len = 0
 
 	if(clevel > 0)
 		overlays += DC_mainframe_charge_meter[clevel]
-
-	if (clevel > 1)
-		overlays += image('icons/obj/machines/dc_network.dmi', "capacitor_mainframe-ow")
-
-
-/obj/machinery/capacitor_bank/mainframe/update_icon()
-	..()
-	update_overlay()
 
 
 /obj/machinery/capacitor_bank/mainframe/examine(mob/user)

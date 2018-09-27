@@ -1,139 +1,153 @@
+<h3>Control Panel</h3>
+<div class="block">
+	<div class="item">
+		<div class="itemLabel"> Status: </div>
+		<div class="itemContent">
+			{{if data.can_activate}}
+				{{:helper.link('On', null, {'active' : 1}, data.active == 1 ? 'selected' : null)}}
+				{{:helper.link('Off', null, {'active' : 0}, data.active ? null == 0 : 'selected')}}
+			{{else}}
+				{{:helper.link('On', null, {}, 'disabled')}}
+				{{:helper.link('Off', null, {}, 'selected')}}
+			{{/if}}
+		</div>
+	</div>
+	<div class="item">
+		<div class="itemLabel"> Input Mode: </div>
+		<div class="itemContent">
+			{{if data.input_modes_available[0]}}
+				{{:helper.link('AC', null, {'DC_input' : 0}, data.DC_input ? null : 'selected')}}
+			{{else}}
+				{{:helper.link('AC', null, {}, 'disabled')}}
+			{{/if}}
+			{{if data.input_modes_available[1]}}
+				{{:helper.link('DC', null, {'DC_input' : 1}, data.DC_input ? 'selected' : null)}}
+			{{else}}
+				{{:helper.link('DC', null, {}, 'disabled')}}
+			{{/if}}
+		</div>		
+	</div>
+	<div class="item">
+		<div class="itemLabel"> Output Mode: </div>
+		<div class="itemContent">
+			{{if data.output_modes_available[0]}}
+				{{:helper.link('AC', null, {'DC_output' : 0}, data.DC_output ? null : 'selected')}}
+			{{else}}
+				{{:helper.link('AC', null, {}, 'disabled')}}
+			{{/if}}
+			{{if data.output_modes_available[1]}}
+				{{:helper.link('DC', null, {'DC_output' : 1}, data.DC_output ? 'selected' : null)}}
+			{{else}}
+				{{:helper.link('DC', null, {}, 'disabled')}}
+			{{/if}}
+		</div>		
+	</div>
+</div>
+
+<h3>Power</h3>
 <div class="statusDisplay">
-	<h3>Power</h3>
-	<div class="statusDisplay">
-		<div class="line">
-			 {{:helper.link('On', null, {'active' : 1}, data.active ? 'selected' : null)}}
-			 {{:helper.link('Off', null, {'active' : 0}, data.active ? null : 'selected')}}
-			 {{:helper.link('Set output', null, {{'output' : 'auto')}}
-		</div>
-		<div class="line">
-			<div class="statusLabel"> Input: </div>
-			<div class="statusValue"> {{:data.input}} W </div>
-		</div>
-		<div class="line">
-			<div class="statusLabel"> Output: </div>
-			<div class="statusValue"> {{:data.output}} W </div>
-		</div>
-		<div class="line">
-			<div class="statusLabel"> Efficiency: </div>
-			<div class="statusValue"> {{:data.efficiency}}% </div>
-		</div>
+	<div class="item">
+		<div class="itemLabel"> Input: </div>
+		<div class="itemContent"> {{:helper.displayBar(data.input, 0, data.target_input, data.input == data.target_input ? "good" : data.input > data.target_input ? "bad" : "average")}} 
+		<br> {{:data.input}} W / {{:data.target_input}} W </div>
 	</div>
-	
-	<h3>Torque</h3>
-	<div class="statusDisplay">
-		<div class="line">
-			<div class="statusLabel"> Input: </div>
-			<div class="statusValue"> {{:data.tinput}} Nm </div>
-		</div>
-		<div class="line">
-			<div class="statusLabel"> Output: </div>
-			<div class="statusValue"> {{:data.toutput}} Nm </div>
-		</div>
-		<div class="line">
-			<div class="statusLabel"> Difference: </div>
-		{{if data.tdiff < data.maxtdiff}}
-			<div class="statusValue good"> {{:data.tdiff}} Nm / {{:data.maxtdiff}} Nm   </div>
-		</div>
+	<div class="item">
+		<div class="itemLabel"> Output: </div>
+		<div class="itemContent"> {{:helper.displayBar(data.output, 0, data.target_output, data.output == data.target_output ? "good" : data.output > data.target_output ? "bad" : "average")}} 
+		<br> {{:data.output}} W / {{:data.target_output}} W 
+		<br> {{:helper.link('Set output', null, {'set_output' : 1})}} </div>
+	</div>
+	<div class="item">
+		<div class="itemLabel"> Efficiency: </div>
+		<div class="itemContent"> {{:data.efficiency}}% </div>
+	</div>
+</div>
+
+<h3>Torque</h3>
+<div class="statusDisplay">
+	<div class="item">
+		<div class="itemLabel"> Input: </div>
+		<div class="itemContent"> {{:data.torque_input}} Nm / {{:data.target_torque_input}} Nm </div>
+	</div>
+	<div class="item">
+		<div class="itemLabel"> Output: </div>
+		<div class="itemContent"> {{:data.torque_output}} Nm / {{:data.target_torque_output}} Nm </div>
+	</div>
+	<div class="item">
+		<div class="itemLabel"> Difference: </div>
+		<div class="itemContent"> {{:helper.displayBar(data.torque_diff, 0, data.torque_maxdiff, data.torque_diff > data.torque_maxdiff * 0.9 ? "average" : "good")}}
+		<br>
+		{{if data.torque_diff < data.torque_maxdiff}}
+			<div class="good"> {{:data.torque_diff}} Nm / {{:data.torque_maxdiff}} Nm </div>
 		{{else}}
-			<div class="statusValue average"> {{:data.tdiff}} Nm / {{:data.maxtdiff}} Nm   </div>
-		</div>
-		<div class="line">
-			<div class= "statusValue average"><i>WARNING: Torque difference too high, shaft will be exposed to stress while active</i></div>
-		</div>
+			<div class="average"> {{:data.torque_diff}} Nm / {{:data.torque_maxdiff}} Nm </div>
 		{{/if}}
+		</div>
 	</div>
-	<h3>Damage</h3>
-	<div class="statusDisplay">
-		<div class="line">
-			<div class="statusLabel"> Stress: </div>
-			<div class="statusValue">
-				{{:helper.displayBar(data.stress, 0, 100, data.stress >= 75 ? "bad" : "average")}}
-			</div>
-			<div class="statusValue">{{:data.stress}}%</div>
+	{{if data.torque_diff > data.torque_maxdiff}}
+		<div class="item">
+			<div class= "itemContent bad"><i>ALERT: Torque difference too high, shaft under stress!</i></div>
 		</div>
-		{{if data.stressPercent >= 75}}
-			<div class="line">
-				<div class= "statusValue bad"><i>ALERT: Shaft stress reaching breaking point</i></div>
-			</div>
-			<div class="line">
-				<div class= "statusValue average"><i>Please reduce torque and repair accumulated damage</i></div>
-			</div>
-		{{/if}}
-		<div class="line">
-			<div class="statusLabel"> Carbon build-up: </div>
-			<div class="statusValue">
-				{{:helper.displayBar(data.carbon, 0, 100, data.carbon >= 50 ? "bad" : "average")}}
-			</div>
-			<div class="statusValue">{{:data.carbon}}%</div>
+	{{else data.target_torque_diff > data.torque_maxdiff}}
+		<div class="item">
+			<div class= "itemContent average"><i>WARNING: Target torque difference too high, shaft may be exposed to stress while active</i></div>
 		</div>
-		{{if data.stressPercent >= 50}}
-			<div class="line">
-				<div class= "statusValue bad"><i>ALERT: Carbon dust levels too high, flash-over possible</i></div>
-			</div>
-			<div class="line">
-				<div class= "statusValue average"><i>Please clean excess carbon dust</i></div>
-			</div>
-		{{/if}}
-	</div>	
-	
-	<h3>Reagents</h3>
-	<div class="statusDisplay">
-		<div class="line">
-			 {{:helper.link('On', null, {'active' : 1}, data.active ? 'selected' : null)}}
-			 {{:helper.link('Off', null, {'active' : 0}, data.active ? null : 'selected')}}
-			 {{:helper.link('Set output', null, {{'output' : 'auto')}}
+	{{/if}}
+</div>
+
+<h3>Damage</h3>
+<div class="statusDisplay">
+	<div class="item">
+		<div class="itemLabel"> Stress: </div>
+		<div class="itemContent"> {{:helper.displayBar(data.stress, 0, 100, data.stress >= 75 ? "bad" : "average")}} {{:data.stress}}%</div>
+	</div>
+	{{if data.stress >= 75}}
+		<div class="item">
+			<div class= "itemContent bad"><i>ALERT: Shaft stress reaching breaking point</i></div>
 		</div>
-		<div class="line">
-			<div class="statusLabel"> Capacity: </div>
-				<div class="statusValue">
-					{{:helper.displayBar(data.reagents. / data.reagents., 0, 1, "good")}}
-				</div>
-				<div class="statusValue">{{:data.reagents.}}u / {{:data.reagents.}}u</div>
-			</div>
-			<div class="line">
-				<div class="statusLabel"> Usage rate: </div>
-				<div class="statusValue"> 1u </div>
-			</div>
-			<div class="line">
-				<div class="statusLabel"> Reagents: </div>
-				{{if data.reagents.length}}
-				<div class="statusValue">
-					<table>
-					<tbody>
-						<tr>
-							<td>Lube:</td>
-							<td>30u</td>
-						</tr>
-						<tr>
-							<td>Ethanol:</td>
-							<td>3u</td>
-						</tr>
-						<tr>
-							<td>Blood:</td>
-							<td>50u</td>
-						</tr>
-					</tbody>
-					</table>
-				</div>
+		<div class="item">
+			<div class= "itemContent average"><i>Please reduce torque difference and repair accumulated damage</i></div>
+		</div>
+	{{/if}}
+	<div class="item">
+		<div class="itemLabel"> Carbon build-up: </div>
+		<div class="itemContent">{{:helper.displayBar(data.carbon, 0, 100, data.carbon >= 50 ? "bad" : "average")}} {{:data.carbon}}%</div>
+	</div>
+	{{if data.carbon >= 50}}
+		<div class="item">
+			<div class= "itemContent bad"><i>ALERT: Carbon dust levels too high, flash-over possible</i></div>
+		</div>
+		<div class="item">
+			<div class= "itemContent average"><i>Please turn off the machine and clear excess carbon dust</i></div>
+		</div>
+	{{/if}}
+</div>
+
+<h3>Reagents</h3>
+<div class="statusDisplay">
+	<div class="item">
+		<div class="itemLabel"> Capacity: </div>
+			<div class="itemContent"> {{:helper.displayBar(data.reagents.total_volume / data.reagents.maximum_volume, 0, 1, "good")}}
+			<br>{{:data.reagents.total_volume}}u / {{:data.reagents.maximum_volume}}u</div>
+		</div>
+		<div class="item">
+			<div class="itemLabel"> Usage rate: </div>
+			<div class="itemContent"> {{:data.reagentRate}}u </div>
+		</div>
+		<div class="item">
+			<div class="itemLabel"> Reagents: </div>
+			<div class="itemContent">
+				<table>
+				<tbody>
+					{{for data.reagents.reagent_list}}
+					<tr>
+						<td>{{:value.name}}:</td>
+						<td>{{:value.volume}}u</td>
+					</tr>
+					{{/for}}
+				</tbody>
+				</table>
 			</div>
 		</div>
 	</div>
 </div>
-
-
-{{if data.reagents.length}}
-	<table>
-		<tbody>
-		{{for data.reagents}}
-			<tr>
-				<td>{{:value.name}}:</td>
-				<td>{{:value.volume}}u</td>
-			</tr>
-		{{/for}}
-		</tbody>
-	</table>
-{{else}}
-	None
-{{/if}}
-
