@@ -40,11 +40,12 @@ var/global/list/DC_mainframe_charge_meter = list(
 	var/datum/DC_network/net = get_DCnet()
 	if(net)
 		data["hasNetwork"] = 1
-		data["charge"] = net.charge
+		data["charge"] = list("num" = net.charge, "text" = "[format_units(net.charge)]J")
 		data["chargeLevel"] = round(charge_level() * 100,0.1)
-		data["capacity"] = net.capacity
-		data["safeCapacity"] = net.safe_capacity
-		data["safeCapacityBonus"] = net.safe_capacity - net.capacity * net.base_safety_limit
+		data["capacity"] = list("num" = net.capacity, "text" = "[format_units(net.capacity)]J")
+		data["safeCapacity"] = list("num" = net.safe_capacity, "text" = "[format_units(net.safe_capacity)]J")
+		var/safe_bonus = net.safe_capacity - net.capacity * net.base_safety_limit
+		data["safeCapacityBonus"] =  list("num" = safe_bonus, "text" = "[format_units(safe_bonus)]J")
 		data["nodes"] = net.nodes.len
 		data["mainframes"] = net.mainframes
 		data["mainframesWanted"] = -round(net.nodes.len / -10) //Ceiling(mDC_node.network.nodes.len / 10). THis should be replaced with an actual Ceiling() some day
@@ -142,7 +143,7 @@ var/global/list/DC_mainframe_charge_meter = list(
 	..()
 	var/datum/DC_network/net = get_DCnet()
 	if(net)
-		to_chat(user, "<span class='notice'>The charge meter reads: [round(charge_level() * 100,0.1)]% ([net.charge] J).</span>")
+		to_chat(user, "<span class='notice'>The charge meter reads: [round(charge_level() * 100,0.1)]% (format_units([net.charge])J).</span>")
 
 
 //-- Machine Overrides

@@ -6,7 +6,7 @@
 				Safe capacity:
 			</div>
 			<div class="itemValue">
-				<div> {{:data.safeCapacity}} J </div>
+				<div> {{:data.safeCapacity.text}} </div>
 			</div>
 		</div>
 		<div class="item">
@@ -14,7 +14,7 @@
 				Max capacity:
 			</div>
 			<div class="itemValue">
-				<div> {{:data.capacity}} J </div>
+				<div> {{:data.capacity.text}} </div>
 			</div>
 		</div>
 	</div>
@@ -23,18 +23,18 @@
 	<div class="statusDisplay">
 		<div class="item">
 			<div class="itemLabel"> Charge: </div>
-			{{if data.safeCapacity >= data.charge}}
-				<div class="itemValue good"> {{:data.charge}} J </div>
+			{{if data.safeCapacity.num >= data.charge.num}}
+				<div class="itemValue good"> {{:data.charge.text}} </div>
 			{{else}}
-				<div class="itemValue bad"> {{:data.charge}} J </div>
+				<div class="itemValue bad"> {{:data.charge.text}} </div>
 			{{/if}}
 		</div>
 		<div class="item">
 			<div class="itemLabel"> Charge percent: </div>
 			<div class="itemValue">
-				{{:helper.displayBar(data.charge, 0, data.safeCapacity, data.charge > data.safeCapacity ? "bad" : "good")}}
+				{{:helper.displayBar(data.charge.num, 0, data.safeCapacity.num, data.charge.num > data.safeCapacity.num ? "bad" : "good")}}
 			</div>
-			<div class="itemValue"> {{:helper.round(100 * data.charge / data.safeCapacity)}}%</div>
+			<div class="itemValue"> {{:helper.round(100 * data.charge.num / data.safeCapacity.num)}}%</div>
 		</div>
 	{{if data.charge > data.safeCapacity}}
 		<div class="item">
@@ -63,7 +63,7 @@
 		</div>
 		<div class="item">
 			<div class="itemLabel"> Safe capacity bonus: </div>
-			<div class="itemValue"> {{:helper.round(100 * data.safeCapacityBonus / data.safeCapacity)}}% ({{:data.safeCapacityBonus}} J) </div>
+			<div class="itemValue"> {{:helper.round(100 * data.safeCapacityBonus.num / data.safeCapacity.num)}}% ({{:data.safeCapacityBonus.text}}) </div>
 		</div>
 		</div>
 {{else}}
