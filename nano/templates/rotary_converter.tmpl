@@ -1,4 +1,248 @@
 <h3>Control Panel</h3>
+<div class="statusDisplay">
+	<div class="item">
+		<div class="statusLabel"> Main Breaker: </div>
+		<div class="statusValue">
+			{{if data.can_activate}}
+				{{:helper.link('On', null, {'active' : 1}, data.active ? 'selected' : null)}}
+				{{:helper.link('Off', null, {'active' : 0}, data.active  ? null : 'selected')}}
+			{{else}}
+				{{:helper.link('On', null, {}, 'disabled')}}
+				{{:helper.link('Off', null, {}, 'selected')}}
+			{{/if}}
+		</div>
+	</div>
+	<div class="item">
+		<div class="statusLabel"> Input: </div>
+		<div class="statusValue">
+			<div class="itemContent"> {{:helper.displayBar(data.input.num, 0, data.target_input.num, data.input.num == data.target_input.num ? "good" : data.input.num > data.target_input.num ? "bad" : "average")}} 
+		<br>{{:data.input.text}} / {{:data.target_input.text}} </div></div>
+		</div>
+	</div>
+	<div class="item">
+		<div class="statusLabel"> Output: </div>
+		<div class="statusValue">
+			<div class="itemContent"> {{:helper.displayBar(data.output.num, 0, data.target_output.num, data.output.num == data.target_output.num ? "good" : data.output.num > data.target_output.num ? "bad" : "average")}} 
+			<br>{{:data.output.text}} / {{:data.target_output.text}} 
+			<br>{{:helper.link('MIN', null, {'set_output' : 'min'})}}
+		        {{:helper.link('SET', null, {'set_output' : 'set'})}}
+		        {{:helper.link('MAX', null, {'set_output' : 'max'})}}
+		    </div>
+		</div>
+	</div>
+	
+</div>
+
+
+<h3>Overview</h3>
+<div class="statusDisplay">
+
+
+	<h4>Damage</h4>
+	<div class="item">
+		<div class="statusLabel"> Stress: </div>
+		<div class="statusValue"> {{:helper.displayBar(data.stress, 0, 100, data.stress >= data.stress_max ? "bad" : "average")}} {{:data.stress}}%</div>
+	</div>
+	<div class="item">
+		<div class="statusLabel"> Torque Difference: </div>
+		<div class="statusValue"> {{:helper.displayBar(data.torque_diff.num, 0, data.torque_maxdiff.num, data.torque_diff.num > data.torque_maxdiff.num * 0.9 ? "average" : "good")}}
+		<br>
+		{{if data.torque_diff.num < data.torque_maxdiff.num}}
+			<div class="good"> {{:data.torque_diff.text}} / {{:data.torque_maxdiff.text}} </div>
+		{{else}}
+			<div class="average"> {{:data.torque_diff.text}} / {{:data.torque_maxdiff.text}} </div>
+		{{/if}}
+		</div>
+	</div>
+	
+	
+	<!-- Torque/Stress alert -->
+	{{if data.stress >= data.stress_max}}
+		<div class="item">
+			<div class= "statusValue bad"><i>ALERT: Shaft stress reaching breaking point!</i></div>
+		</div>
+	{{else data.torque_diff.num > data.torque_maxdiff.num}}
+		<div class="item">
+			<div class= "statusValue bad"><i>ALERT: Torque difference too high, shaft under stress!</i></div>
+		</div>
+	{{else data.target_torque_diff.num > data.torque_maxdiff.num}}
+		<div class="item">
+			<div class= "statusValue average"><i>WARNING: Target torque difference too high, shaft may be exposed to stress while active</i></div>
+		</div>
+	{{/if}}
+	
+	
+	<h4>Reagents</h4>
+	<div class="item">
+		<div class="statusLabel"> Carbon: </div>
+		<div class="statusValue">{{:helper.displayBar(data.carbon, 0, data.carbon_max, data.carbon >= data.carbon_limit ? "bad" : data.carbon > data.carbon_optimal - 5 && data.carbon < data.carbon_optimal + 5 ? "good" : "average")}} {{:data.carbon}}%</div>
+	</div>
+	<div class="item">
+		<div class="statusLabel"> Ethanol: </div>
+		<div class="statusValue">
+			<div class="displayBar">
+				<div class="displayBarFill good" style="width:90%"></div> 
+			</div> 90%	
+		</div>
+	</div>
+	<div class="item">
+		<div class="statusLabel"> Lube: </div>
+		<div class="statusValue">
+			<div class="displayBar">
+				<div class="displayBarFill neutral" style="width:20%"></div>
+			</div> 20%
+		</div>
+	</div>
+	
+	
+	<!-- Carbon Alert -->
+	{{if data.carbon >= data.carbon_limit}}
+		<div class="item">
+			<div class= "statusValue bad"><i>ALERT: Carbon dust levels too high, engine may suffer arcing and flash-over!</i></div>
+		</div>
+	{{/if}}
+	
+	<h4>Status</h4>
+	<div class="item">
+		<div class="statusLabel"> Efficiency: </div>
+		<div class="statusValue"> {{:data.efficiency}}% </div>
+	</div>
+</div>
+
+
+<!-- Screen selector -->
+<hr>
+<div class="itemLabel"> Screen: </div>
+<div class="itemValue">
+	<div class="link">Power flow</div>
+	<div class="link">Mechanical status</div>
+	<div class="link">Reagent Control</div>
+	{{:helper.link('Power flow', null, {'ui_screen' : data.ui_power}, data.ui_screen == data.ui_power ? 'selected' : null)}}
+	{{:helper.link('Mechanical status', null, {'ui_screen' : data.ui_mechanical}, data.ui_screen == data.ui_mechanical ? 'selected' : null)}}
+	{{:helper.link('Reagent Control', null, {'ui_screen' : data.ui_reagent}, data.ui_screen == data.ui_reagent : null)}}
+</div>
+<hr>
+
+
+<!-- Power Flow Screen -->
+{{if data.screen == data.ui_power }}
+<div class="statusDisplayRecords">
+	<div class="item">
+		<div class="statusLabel"> Input: </div>
+		<div class="statusValue">
+			{{if data.input_modes_available[0]}}
+				{{:helper.link('AC', null, {'DC_input' : 0}, data.input_mode ? null : 'selected')}}
+			{{else}}
+				{{:helper.link('AC', null, {}, 'disabled')}}
+			{{/if}}
+			{{if data.input_modes_available[1]}}
+				{{:helper.link('DC', null, {'DC_input' : 1}, data.input_mode ? 'selected' : null)}}
+			{{else}}
+				{{:helper.link('DC', null, {}, 'disabled')}}
+			{{/if}}
+		</div>
+	</div>
+	<div class="item">
+		<div class="statusLabel"> Output: </div>
+		<div class="statusValue">
+			{{if data.output_modes_available[0]}}
+				{{:helper.link('AC', null, {'DC_output' : 0}, data.output_mode ? null : 'selected')}}
+			{{else}}
+				{{:helper.link('AC', null, {}, 'disabled')}}
+			{{/if}}
+			{{if data.output_modes_available[1]}}
+				{{:helper.link('DC', null, {'DC_output' : 1}, data.output_mode ? 'selected' : null)}}
+			{{else}}
+				{{:helper.link('DC', null, {}, 'disabled')}}
+			{{/if}}
+		</div>
+	</div>
+</div>
+
+
+<!-- Torque screen -->
+{{else data.screen == data.ui_mechanical }}
+<div class="statusDisplayRecords">
+	<div class="item">
+		<div class="statusLabel"> Input Torque: </div>
+			<div class="statusValue"> {{:data.torque_input.text}} / {{:data.target_torque_input.text}} </div>
+		</div>
+	</div>
+	<div class="item">
+		<div class="statusLabel"> Output Torque: </div>
+		<div class="statusValue"> {{:data.torque_output.text}} / {{:data.target_torque_output.text}} </div>
+		</div>
+	</div>
+	<div class="item">
+		<div class="statusLabel"> Efficiency impact: </div>
+		<div class="statusValue average"> {{efficiency_torque}}%</div>
+	</div>
+</div>
+
+
+<!-- Reagent screen -->
+{{else data.screen == data.ui_reagent }}
+<div class="statusDisplayRecords">
+	<div class="item">
+		<h4>Carbon dust</h4>
+		<div class="statusLabel"> Total: </div>
+		<div class="statusValue"> {{:data.carbon}} / {{:data.carbon_max}} </div>
+	</div>
+	<div class="item">
+		<div class="statusLabel"> Build-up rate: </div>
+		<div class="statusValue"> {{:data.carbon_rate}} Units </div>
+	</div>
+	<div class="item">
+		<div class="statusLabel"> Efficiency impact: </div>
+		<div class="statusValue good"> +{{:data.efficiency_carbon}}%</div>
+	</div>
+	<div class="item">
+		<h4>Space lube</h4>
+		<div class="statusLabel"> Total: </div>
+		<div class="statusValue"> {{:data.lube}} / {{:data.lube_max}} </div>
+	</div>
+	<div class="item">
+		<div class="statusLabel"> Usage Rate: </div>
+		<div class="statusValue">
+			{{:helper.link('--', null, {'lube_rate' : -1})}}
+			{{:helper.link('-', null, {'lube_rate' : -0.1})}}
+			<div>{{:data.lube_rate}} Units</div>
+			{{:helper.link('+', null, {'lube_rate' : 0.1})}}
+			{{:helper.link('++', null, {'lube_rate' : 1})}}
+		</div>
+	</div>
+	<div class="item">
+		<div class="statusLabel"> Efficiency impact: </div>
+		<div class="statusValue good"> +{{:data.efficiency_lube}}%</div>
+	</div>
+	<div class="item">
+		<h4>Ethanol</h4>
+		<div class="statusLabel"> Total: </div>
+		<div class="statusValue"> {{:data.ethanol}} / {{:data.ethanol_max}} </div>
+	</div>
+	<div class="item">
+		<div class="statusLabel"> Usage Rate: </div>
+		<div class="statusValue">
+			{{:helper.link('--', null, {'ethanol_rate' : -1})}}
+			{{:helper.link('-', null, {'ethanol_rate' : -0.1})}}
+			{{:data.ethanol_rate}} Units
+			{{:helper.link('+', null, {'ethanol_rate' : 0.1})}}
+			{{:helper.link('++', null, {'ethanol_rate' : 1})}}
+		</div></div>
+	</div>
+	<div class="item">
+		<div class="statusLabel"> Carbon dust impact: </div>
+		<div class="statusValue good"> -{{:data.ethanol_impact}}u</div>
+	</div>
+</div>
+
+{{/if}}
+
+
+
+
+
+<h3>Control Panel</h3>
 <div class="block">
 	<div class="item">
 		<div class="itemLabel"> Status: </div>
@@ -113,7 +357,7 @@
 	{{/if}}
 	<div class="item">
 		<div class="itemLabel"> Carbon build-up: </div>
-		<div class="itemContent">{{:helper.displayBar(data.carbon, 0, 100, data.carbon >= data.carbon_max ? "bad" : "average")}} {{:data.carbon}}%</div>
+		<div class="itemContent">{{:helper.displayBar(data.carbon, 0, data.carbon_max, data.carbon >= data.carbon_limit ? "bad" : data.carbon > data.carbon_optimal - 5 && data.carbon < data.carbon_optimal + 5 ? "good" : "average")}} {{:data.carbon}}%</div>
 	</div>
 	{{if data.carbon >= data.carbon_max}}
 		<div class="item">

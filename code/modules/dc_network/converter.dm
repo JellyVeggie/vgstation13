@@ -345,6 +345,11 @@
 	ui_tmpl = "rotary_converter.tmpl" //The .tmpl file used for the UI
 	ui_name = "The Rotary Converter" // The name that'll appear on the UI
 
+	var/const/ui_power = 1
+	var/const/ui_mechanical = 2
+	var/const/ui_reagent = 3
+	var/ui_screen = ui_power //Which screen we're viewing
+
 	//Machine
 	//TODO: Components and circuit board
 	//component_parts = newlist()
@@ -377,41 +382,43 @@
 	var/torque_output = 0        // Torque required by the output on the generator to match the frequency, measured in Nm
 	var/torque_max_diff = 0      // Due to efficiency, there's a differenece in torque between the Motor and generator. The shaft can only take so much
 	                             //  excess torque before it suffers from it, causing stress. Metal used in construction affects strength. TODO: Balance
+
+	//Damage
 	var/stress = 0               // Current stress suffered from the difference in motor and generator torques, as a percent
 	var/stress_cumulative = 0    // Accumulated stress from previous stressful episodes, as a percent
 	var/const/stress_limit = 0.8 // Past this point you'll have a (stress + stress_cumulative - limit)% probability of breaking.
 
-	var/list/shaft_strength = list("metal"            = 805e6                          * (2 - max_efficiency) / frequency,
-	                               "plasteel"         = 10.5e9                         * (2 - max_efficiency) / frequency)
-	                             //"[sheet.name]      = [max output at max efficiency] * (2 - max_efficiency) / frequency)"
-
-	//Reagents
-	var/const/carbon_dust_optimal = 60 // You'll feel the full effects of efficiency_carbon at this point
-	var/const/carbon_dust_limit = 80   // Past this point you'll have a (carbon - limit)% probability of flash-overs.
-	var/const/carbon_dust_max = 100
-	var/datum/reagents/carbon_dust = new /datum/reagents(carbon_dust_max) // Carbon dust. Clean it out with ethanol
-	// Carbon produced per torque Nm by wearing down the brushes. TODO: Balance. 100 ticks at max torque on a metal shaft for now
-	var/const/carbon_per_torque = 1 / (805e6 * (2 - max_efficiency) / frequency)
-
-	var/lube_rate = 0             // How much lube we consume every tick
-	var/const/lube_max_rate = 100
-	var/ethanol_rate = 0          // How much ethanol we consume every tick
-	var/const/ethanol_max_rate = 100
+	var/list/shaft_strength = list("metal"       = 805e6        * (2 - max_efficiency) / frequency,
+	                               "plasteel"    = 10.5e9       * (2 - max_efficiency) / frequency)
+	                             //"[sheet.name] = [max output] * (2 - max_efficiency) / frequency"
 
 	var/flashover = 0             // How severe the flash-over currently is. Replaces target_input during the flash-over
 	var/flashover_start = 0       // How severe the flash-over was when it started. Stores the original target_input
 	var/const/flashover_peak = 20 // How bad the flash-over can get, aka flashover_start * flashover_peak.
-	                              //  From a 1926 article: http://nzetc.victoria.ac.nz/tm/scholarly/tei-Gov01_05Rail-t1-body-d23.html
-	                              //  "...it may be stated that a flash-over [...] will be in the region of 20 times the output of the generator"
-	                              //  It's an interesting read, so give it a go.
 
-	reagents = new /datum/reagents(100) //TODO: Yet another thing to balance
+	//Reagents
+	var/const/carbon_dust_max = 100
+	var/const/carbon_dust_optimal = 60 // You'll feel the full effects of efficiency_carbon at this point
+	var/const/carbon_dust_limit = 80   // Past this point you'll have a (carbon - limit)% probability of flash-overs.
+	var/const/carbon_per_torque = 1 / (805e6 * (2 - max_efficiency) / frequency)// Carbon produced per torque Nm by wearing down the brushes. TODO: Balance. 100 ticks at max torque on a metal shaft for now
 
+	var/const/lube_max = 100     // TODO: Balance
+	var/lube_rate = 0            // How much lube we consume every tick
+	var/const/lube_max_rate = 20 // TODO: Balance
+
+	var/const/ethanol_max = 100     // TODO: Balance
+	var/ethanol_rate = 0            // How much ethanol we consume every tick
+	var/const/ethanol_max_rate = 20 // TODO: Balance
+
+	reagents = new /datum/reagents(carbon_dust_max + lube_max + ethanol_max)
+
+/obj/machinery/power/converter/rotaryM/New()
+	create_reagents(carbon_dust_max + lube_max + ethanol_max)
 
 /obj/machinery/power/converter/rotaryM/Destroy()
 
-	reagents = null
-	qdel(reagents)
+		reagents = null
+		qdel(reagents)
 
 //-- Connect Machines --
 /obj/machinery/power/converter/rotaryM/proc/connect_to_G()
@@ -426,7 +433,7 @@
 		available_modes_flags = DCINPUT | ACINPUT
 		generator.available_modes_flags = DCOUTPUT | ACOUTPUT
 		update_icon()
-		generator.update_icon
+		generator.update_icon()
 		return 1
 	return 0
 
@@ -490,10 +497,10 @@
 		return
 
 	if(!flashover_start) //Start a flash-over
-		playsound(src, 'sound/effects/engine_alert2.ogg', 50, 1) //UH OH!
-		generator.update_icon()
 		flashover_start = target_input
 		flashover = flashover_start
+		playsound(src, 'sound/effects/engine_alert2.ogg', 50, 1) //UH OH! TODO: Get a better sound
+		generator.update_icon()
 
 	if(prob(max(100 * (flashover / (flashover_start * flashover_peak)) - 20, 0)))
 		//The worse the flash-over gets, the higher the chance it might finally stop
@@ -554,40 +561,55 @@
 
 
 //-- Process --
-/obj/machinery/power/converter/rotaryM/proc/update_efficiency()
-	var/n = 0
-	efficiency = base_efficiency
-
-	/* 0 >= n >= 1
-	 * The graph here does a sinewave's "peak to bottom" portion from 0 to the maximum torque a metal shaft allows
-	 * Then it goes back up, from a metal shaft's maximum torque to a plasteel's shaft, and stays at maximum beyond there.
-	 */
+/obj/machinery/power/converter/rotaryM/proc/update_eff_torque()
+	// The graph here does a sinewave's "peak to bottom" portion from 0 to the maximum torque a metal shaft allows
+	// Then it goes back up, from a metal shaft's maximum torque to a plasteel's shaft, and stays at maximum beyond there.
 	var/m = shaft_strength["metal"] / (2 - max_efficiency)
 	var/p = shaft_strength["plasteel"] / (2 - max_efficiency)
 	if(torque_output <= m)
-		n = 0.5 * sin(torque_output * pi / m + 0.5 * pi) + 0.5
+		efficiency_torque = 0.5 * sin(torque_output * PI / m + 0.5 * PI) + 0.5
 	else if (torque_output <= p)
-		n = 0.5 * sin(torque_output * pi/(p - m) - m - 0.5 * pi) + 0.5
+		efficiency_torque = 0.5 * sin(torque_output * PI/(p - m) - m - 0.5 * PI) + 0.5
 	else
-		n = 1
+		efficiency_torque = 1
+	efficiency_torque *= efficiency_torque_factor
 
-	efficiency -= 0.25*n
 
-	n = 0.5 * sin(carbon_dust * pi/50 + 0.5*pi) + 0.5
+/obj/machinery/power/converter/rotaryM/proc/update_eff_carbon()
+	//TODO: Improve equation for future changes to max and optimal not to be an issue. Prolly something like torque efficiency
+	var/carbon_dust = reagents.get_reagent_amount(CARBON)
+	efficiency_carbon = sin(carbon_dust * PI/carbon_dust_optimal + 0.5 * PI) + 0.5
+	efficiency_carbon *= efficiency_carbon_factor
 
+
+/obj/machinery/power/converter/rotaryM/proc/update_eff_lube()
+	var/n = lube_max_rate ? 1 - ((lube_rate - lube_max_rate)/lube_max_rate)**2 : 0
+	efficiency_lube = sqrt(n)
+	efficiency_lube *= efficiency_lube_factor
+
+
+/obj/machinery/power/converter/rotaryM/proc/update_efficiency()
+	efficiency = base_efficiency
+	efficiency += efficiency_torque + efficiency_carbon + efficiency_lube
 
 
 /obj/machinery/power/converter/rotaryM/process()
 	if(state)
+		//Transfer power
 		..()
-		if(flashover || (active && prob(max(100 * (carbon_dust - carbon_dust_limit), 0))))//Start (or continue) a flashover
-			flashover()
+
 
 		if(active)
 			//Get torque. TODO: effects of lube
 			torque_input = input / frequency
 			torque_output = output / frequency
-			carbon_dust = min(carbon_dust + carbon_per_torque * torque_output, 1)
+
+			var/update_efficiency
+			if(torque_output)
+
+			var/carbon_dust = reagents.get_reagent_amount(CARBON)
+
+			carbon_dust = min(carbon + carbon_per_torque * torque_output, carbon_dust_max)
 
 			if(torque_input - torque_output > torque_max_diff)//Get stressed
 				if (prob(25))
@@ -601,6 +623,11 @@
 				explode(input)
 			else if (prob(25))
 				playsound(src, 'sound/effects/clang.ogg', 50, 1, 1)
+
+
+		if(flashover || (active && prob(max(100 * (carbon_dust - carbon_dust_limit), 0))))//Start (or continue) a flashover
+			flashover()
+
 
 
 //-- Interact Overrides --
@@ -670,6 +697,9 @@
 	data["target_output"] = list("num" = target_output, "text" = "[format_units(target_output)]W")
 
 	data["efficiency"] = round(efficiency * 100, 0.1)
+	data["efficiency_torque"] = round(efficiency_torque * 100, 0.1)
+	data["efficiency_carbon"] = round(efficiency_carbon * 100, 0.1)
+	data["efficiency_lube"] = round(efficiency_lube * 100, 0.1)
 
 	data["torque_input"] = list("num" = torque_input, "text" = "[format_units(torque_input)] Nm")
 	holder = target_input / frequency
@@ -688,16 +718,25 @@
 	data["stress"] = stress + stress_cumulative
 	data["stress_limit"] = stress_limit
 
-	data["carbon"] = list("num" = carbon.volume, "text" = "[format_units(carbon.volume)]")
+	data["carbon"] = list("num" = carbon_dust.total_volume, "text" = "[round(carbon_dust.total_volume, 0.001)]")
 	data["carbon_limit"] = carbon_dust_limit
 	data["carbon_optimal"] = carbon_dust_optimal
 	data["carbon_max"] = carbon_dust_max
+	data["carbon_rate"] = round(carbon_per_torque * torque_output, 0.001)
 
-	var/list/r_list
-	for (var/datum/reagent/R in reagents.reagent_list)
-		r_list["[R.name]"] = R.volume
-	data["reagents"] = list("total_volume" = reagents.total_volume, "maximum_volume" = reagents.maximum_volume, "reagent_list" = r_list)
-	data["reagentRate"] = 0
+	data["lube"] = list("num" = lube.total_volume, "text" = "[round(lube.total_volume, 0.001)]")
+	data["lube_max"] = lube_max
+	data["lube_rate"] = lube_rate
+
+	data["ethanol"] = list("num" = lube.total_volume, "text" = "[round(lube.total_volume, 0.001)]")
+	data["ethanol_max"] = ethanol_max
+	data["ethanol_rate"] = ethanol_rate
+	data["ethanol_impact"] = ethanol_rate / 2
+
+	data["ui_screen"] = ui_screen
+	data["ui_power"] = ui_power
+	data["ui_mechanical"] = ui_mechanical
+	data["ui_reagent"] = ui_reagent
 
 	return data
 
