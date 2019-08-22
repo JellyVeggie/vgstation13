@@ -13,6 +13,7 @@
 
 //Reagents
 
+#define PYROXADONE "pyroxadone"
 #define VAPORSALT			"vaporsalt"
 #define BUSTANUT 			"bustanut"
 #define ROGAN 			"rogan"
